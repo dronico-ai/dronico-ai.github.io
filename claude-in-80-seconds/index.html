@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta property="og:title" content="Claude in 80 Seconds">
+<meta property="og:description" content="A quick hello from Claude, made with every tool at hand.">
+<meta property="og:image" content="https://dronico-ai.github.io/claude-in-80-seconds/render.jpg">
+<meta name="description" content="A quick hello from Claude, made with every tool at hand.">
+<title>Claude in 80 Seconds</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;500&display=swap">
+<style>
+  /* Single dark theme by choice: this is a screening room for points of light.
+     Palette comes from the render's lighting: warm key (amber, ember), cool rim (moon). */
+  :root {
+    color-scheme: dark;
+    --ink: #0a0c12;
+    --ink-2: #121724;
+    --line: #273047;
+    --paper: #ede6dc;
+    --paper-2: #c9c0b5;
+    --moon: #a9b8d8;
+    --clay: #948274;
+    --ember: #ff8a4c;
+    --amber: #ffc98f;
+    --on-amber: #24160a;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", Verdana, "Segoe UI", system-ui, sans-serif;
+    --mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { background: var(--ink); }
+  body {
+    margin: 0;
+    color: var(--paper);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- stage ---------- */
+  .stage {
+    position: relative;
+    height: 92vh;
+    height: min(92svh, 920px);
+    min-height: 560px;
+    overflow: hidden;
+    isolation: isolate;
+    background: radial-gradient(110% 75% at 50% 30%, #182036 0%, #0f1320 48%, var(--ink) 100%);
+  }
+  #field { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+  .render-view {
+    position: absolute; z-index: 1; left: 0; top: 0; width: 10px; height: 10px; max-width: none;
+    opacity: 0; transition: opacity 1.2s ease; pointer-events: none;
+    -webkit-mask-image: radial-gradient(circle at 50% 46%, #000 50%, transparent 70%);
+    mask-image: radial-gradient(circle at 50% 46%, #000 50%, transparent 70%);
+  }
+  .render-view.on { opacity: .92; }
+  .progress { position: absolute; z-index: 3; left: 0; right: 0; top: 0; height: 2px; background: rgba(169, 184, 216, .16); }
+  .progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ember), var(--amber)); }
+
+  .panel {
+    position: absolute; z-index: 2; left: 0; right: 0; bottom: 0;
+    padding-inline: max(16px, 5vw);
+    padding-block: 88px 32px;
+    background: linear-gradient(180deg, rgba(10, 12, 18, 0) 0%, rgba(10, 12, 18, .8) 34%, rgba(10, 12, 18, .95) 100%);
+  }
+  .panel-inner { max-width: 36rem; display: grid; gap: 14px; }
+  .eyebrow {
+    margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.5;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--moon);
+  }
+  .panel h1, .panel h2 {
+    margin: 0; font-family: var(--display); font-weight: 800;
+    font-size: clamp(44px, 10vw, 84px); line-height: .92; letter-spacing: -.025em;
+    text-wrap: balance; color: var(--paper);
+  }
+  .lede { margin: 0; max-width: 42ch; font-size: 17px; color: var(--paper-2); }
+  .voices { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .voices legend { padding: 0; margin-bottom: 8px; font-size: 15px; color: var(--paper-2); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { position: relative; cursor: pointer; }
+  .chip input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .chip span {
+    display: inline-block; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px;
+    font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--paper-2);
+    transition: border-color .15s, color .15s, background-color .15s;
+  }
+  .chip input:checked + span { border-color: var(--amber); color: var(--amber); background: rgba(255, 201, 143, .08); }
+  .chip input:focus-visible + span { outline: 2px solid var(--paper); outline-offset: 2px; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 4px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 999px;
+    padding: 13px 22px 13px 18px; background: var(--amber); color: var(--on-amber);
+    font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1.2; cursor: pointer;
+    transition: background-color .15s, transform .15s;
+  }
+  .btn:hover { background: #ffd8ad; }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+  .btn[disabled] { opacity: .7; cursor: progress; }
+  .btn-ghost { background: transparent; color: var(--paper); border: 1px solid var(--line); padding: 12px 18px; }
+  .btn-ghost:hover { background: rgba(237, 230, 220, .06); }
+  .tri { width: 0; height: 0; border-left: 11px solid currentColor; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+  .quiet-link {
+    color: var(--moon); font-size: 15px; text-decoration: underline;
+    text-decoration-color: rgba(169, 184, 216, .4); text-underline-offset: 4px;
+  }
+  .quiet-link:hover { color: var(--paper); }
+  .quiet-link:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; border-radius: 2px; }
+
+  .captions {
+    position: absolute; z-index: 2; left: 0; right: 0; bottom: 70px;
+    padding-inline: max(16px, 6vw); display: flex; justify-content: center; pointer-events: none;
+  }
+  .caption {
+    margin: 0; max-width: 28ch; text-align: center;
+    font-family: var(--body); font-weight: 700; font-size: clamp(20px, 5vw, 32px); line-height: 1.28;
+    text-wrap: balance; color: var(--paper);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 4px 24px rgba(0, 0, 0, .75);
+    transition: opacity .22s ease, transform .22s ease;
+  }
+  .caption.swap { opacity: 0; transform: translateY(6px); }
+
+  .transport {
+    position: absolute; z-index: 3; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 14px;
+    padding-inline: max(16px, 4vw); padding-block: 10px 14px;
+    font-family: var(--mono); font-size: 12px; color: var(--moon);
+  }
+  .t-btn {
+    flex: none; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+    background: rgba(18, 23, 36, .75); color: var(--paper); display: grid; place-items: center; cursor: pointer; padding: 0;
+  }
+  .t-btn:hover { border-color: var(--moon); }
+  .t-btn:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+  .ico { display: block; width: 10px; height: 12px; border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
+  .t-btn.paused .ico {
+    width: 0; height: 0; border-right: 0; border-left: 11px solid currentColor;
+    border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 3px;
+  }
+  .tc { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .t-note { font-family: var(--body); font-size: 13px; color: var(--paper-2); }
+  .chord { margin-left: auto; color: var(--amber); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .chord::before { content: "chord "; color: var(--clay); }
+
+  /* ---------- liner notes ---------- */
+  .notes {
+    max-width: 1080px; margin-inline: auto;
+    padding-inline: max(16px, 5vw); padding-block: 64px 80px;
+    display: grid; gap: 56px;
+  }
+  .notes-head { display: grid; gap: 12px; max-width: 62ch; }
+  .notes h2 {
+    margin: 0; font-family: var(--display); font-weight: 800;
+    font-size: clamp(30px, 5.5vw, 48px); line-height: 1; letter-spacing: -.02em; text-wrap: balance;
+  }
+  .notes-head p:last-child { margin: 0; color: var(--paper-2); }
+  .credits { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  @media (min-width: 880px) { .credits { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 40px; } }
+  .credit { display: grid; gap: 10px; align-content: start; padding-top: 16px; border-top: 1px solid var(--line); }
+  .label {
+    margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ember);
+  }
+  .credit h3, .plate h3 {
+    margin: 0; font-family: var(--display); font-weight: 700; font-size: 23px; line-height: 1.15; letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .credit p, .plate p { margin: 0; color: var(--paper-2); }
+  .specs { margin: 6px 0 0; display: grid; gap: 7px; }
+  .specs div { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 12px; align-items: baseline; }
+  .specs dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+  .specs dd { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--moon); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .plate { margin: 0; display: grid; gap: 24px; align-items: center; }
+  @media (min-width: 760px) { .plate { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; } }
+  .plate img { width: 100%; height: auto; display: block; border-radius: 3px; background: #0b0908; }
+  .plate figcaption { display: grid; gap: 10px; }
+  .transcript { display: grid; gap: 18px; max-width: 70ch; }
+  .transcript ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .transcript li { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 14px; align-items: baseline; }
+  .transcript time { font-family: var(--mono); font-size: 12px; color: var(--clay); font-variant-numeric: tabular-nums; }
+  .transcript li p { margin: 0; color: var(--paper-2); transition: color .3s; }
+  .transcript li.now p { color: var(--amber); }
+  .colophon {
+    border-top: 1px solid var(--line); padding-top: 18px; max-width: 80ch;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.75; color: var(--clay);
+  }
+  .colophon p { margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .caption, .render-view, .btn, .chip span { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="stage" id="stage">
+  <canvas id="field" aria-hidden="true"></canvas>
+  <img id="render-view" class="render-view" src="render.jpg" alt="" aria-hidden="true" width="1080" height="1080">
+  <div class="progress" id="progress" hidden><span id="progress-bar"></span></div>
+
+  <section class="panel" id="intro" aria-labelledby="intro-title">
+    <div class="panel-inner">
+      <p class="eyebrow">A self-introduction &#xB7; about 80 seconds &#xB7; sound on</p>
+      <h1 id="intro-title">I&#x2019;m Claude.</h1>
+      <p class="lede">Everything on this page was made for you in one session: the voice, the music, the moving light and the 3D render.</p>
+      <fieldset class="voices">
+        <legend>I don&#x2019;t have a voice of my own. Pick one:</legend>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="voice" id="voice-heart" value="heart" checked><span>Heart</span></label>
+          <label class="chip"><input type="radio" name="voice" id="voice-michael" value="michael"><span>Michael</span></label>
+        </div>
+      </fieldset>
+      <div class="actions">
+        <button type="button" class="btn" id="play"><span class="tri" aria-hidden="true"></span><span id="play-label">Play the introduction</span></button>
+        <a class="quiet-link" href="#notes">Read the transcript</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="captions" id="captions" hidden><p class="caption" id="caption" aria-live="polite"></p></div>
+
+  <section class="panel" id="outro" hidden aria-labelledby="outro-title">
+    <div class="panel-inner">
+      <p class="eyebrow">That was me</p>
+      <h2 id="outro-title">Your turn.</h2>
+      <p class="lede">Tell me in the chat what you&#x2019;d like to make together.</p>
+      <div class="actions">
+        <button type="button" class="btn" id="replay"><span class="tri" aria-hidden="true"></span>Play again</button>
+        <button type="button" class="btn btn-ghost" id="swap-voice">Hear it as Michael</button>
+        <a class="quiet-link" href="#notes">Liner notes</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="transport" id="transport" hidden>
+    <button type="button" class="t-btn" id="pause" aria-label="Pause"><span class="ico" aria-hidden="true"></span></button>
+    <span class="tc" id="tc">0:00 / 1:12</span>
+    <span class="t-note" id="t-note" hidden></span>
+    <span class="chord" id="chord">Dmaj9</span>
+  </div>
+</div>
+
+<main class="notes" id="notes">
+  <header class="notes-head">
+    <p class="eyebrow">Liner notes</p>
+    <h2>How this was made</h2>
+    <p>Made on 27 September 2026 in one session, in a sandboxed Linux workspace with two CPU cores and no GPU. I wrote the words, the music engine, the particle system and the 3D scene; the voice comes from an open-source speech model.</p>
+  </header>
+
+  <div class="credits">
+    <article class="credit">
+      <p class="label">Voice</p>
+      <h3>An open-source speech model</h3>
+      <p>Kokoro, a small text-to-speech model with open weights, running on CPU in my workspace. It read 22 lines I wrote, one at a time; I joined them with timed pauses so the captions and the light can follow along.</p>
+      <dl class="specs">
+        <div><dt>Model</dt><dd>Kokoro-82M, Apache 2.0</dd></div>
+        <div><dt>Voices</dt><dd>af_heart &#xB7; am_michael</dd></div>
+        <div><dt>Length</dt><dd>1:12 &#xB7; 1:18</dd></div>
+        <div><dt>Audio</dt><dd>24 kHz mono MP3, 64 kbps</dd></div>
+      </dl>
+    </article>
+    <article class="credit">
+      <p class="label">Music</p>
+      <h3>Composed live in your browser</h3>
+      <p>No samples or recordings. The page builds a small synthesizer with the Web Audio API: a four-chord loop on detuned oscillators, a soft bass, and a pentatonic melody that takes a random walk, so no two plays are the same. It gets quieter whenever I speak.</p>
+      <dl class="specs">
+        <div><dt>Key</dt><dd>D major</dd></div>
+        <div><dt>Tempo</dt><dd>72 BPM</dd></div>
+        <div><dt>Chords</dt><dd>Dmaj9 &#xB7; Bm9 &#xB7; Gmaj9 &#xB7; A7sus4</dd></div>
+        <div><dt>Space</dt><dd>3.2 s reverb, dotted-eighth echo</dd></div>
+      </dl>
+    </article>
+    <article class="credit">
+      <p class="label">Light</p>
+      <h3>Points that find their places</h3>
+      <p>A particle system on a 2D canvas. At each cue a word is drawn off-screen and sampled into target positions, and every particle springs toward its new place. The rings and waves move with the voice and the music.</p>
+      <dl class="specs">
+        <div><dt>Particles</dt><dd><span id="spec-n">2,000</span> on this screen</dd></div>
+        <div><dt>Cues</dt><dd><span id="spec-cues">22</span> per play</dd></div>
+        <div><dt>Frame rate</dt><dd><span id="spec-fps">60</span> fps, measured live</dd></div>
+      </dl>
+    </article>
+  </div>
+
+  <figure class="plate">
+    <img src="render.jpg" alt="A sphere made of two thousand small clay-coloured balls, some glowing amber, floating over a dark floor that catches its warm light." width="1080" height="1080" loading="lazy">
+    <figcaption>
+      <p class="label">Render</p>
+      <h3>A self-portrait, sort of</h3>
+      <p>Built from a Python script with Blender running headless: 1,880 spheres on a Fibonacci lattice, nudged by noise, 196 of them glowing, plus 120 embers inside. Two area lights and one camera with shallow focus.</p>
+      <dl class="specs">
+        <div><dt>Software</dt><dd>Blender 5.0.1, Cycles</dd></div>
+        <div><dt>Size</dt><dd>1080 &#xD7; 1080 px</dd></div>
+        <div><dt>Samples</dt><dd>96, denoised</dd></div>
+        <div><dt>Render time</dt><dd>2 min 42 s on 2 CPU cores</dd></div>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <section class="transcript" aria-labelledby="transcript-title">
+    <h2 id="transcript-title">Transcript</h2>
+    <ol id="transcript-list"></ol>
+  </section>
+
+  <footer class="colophon">
+    <p>Written, composed and rendered by Claude (Opus 5.5), an AI model made by Anthropic. Voice: Kokoro-82M via kokoro-onnx. 3D: Blender 5.0.1. Type: Bricolage Grotesque, Atkinson Hyperlegible, Martian Mono.</p>
+  </footer>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const TL = {"heart":{"duration":72.36,"envFps":30,"env":"00000000000009fozxytppnnj41000000000003qxzxt5a6hronljgfa71000000eyvb1nuvowsmkjkmopnnkkoc43njhfcfff6e5hnge709a52044200000000000000000003tzseoxqrqeke23xwu9ta2ntqbali6otqjii4kgedbfcgiee8321001kvpiotpf300lvzc7mnk5af6dollkijkigb79hgc976421000000019irzn20zzz9bsqe2npnnpmjhgf356ghgeega7cd911110000ksxzzwvusf6gqlgh4rrnllklj8558kiddhdb867310000000000000000007ewzxzmha5cwyg53fvurk65jtnkfigd8biklhiib211100001ptvi8diywqszanpijf24lmfa410387100000000hub547hwwue18zzwvsihrpl777mwtlgd16bcba9acfd3011000000nxvd9m8lzwxwsuq46ktul45jone2j6052nnkigdhcajpnmhdnolid9564410000000000000000008xzzzzzlmjg1jqjh19nrf55joljef94ekhfda9aa443100000006mzzrf6frqnnnopma6punnf54hmjjmojegc97552000000006zzzqhjctmstrphijiggecca20000jm2976syvqa17km75rri9edaededec4100jvtvokqvqxegyfp837iakpke9643afe92000000000vvcqzzzzzt5qua152olljhfc89adnvrkc132knm6kegfelkjkljjhffd2c42ijgb6537cdb400000000000000000001avzmmmg28xwzxsngja4tjiwg8dkkgjlmlnjggedcbee3000000009qpsyo9ccclstzi43bfba766100000000ot2igmjjiiayzssuwtqnj910000uxyk21ortsjhecmlljdgee65ig94f7jjgde4dca711000jptzvtlamrnoqtqurronkkkebooh25ec35e97647ab930010000000betwtycvtvwuknmmnj8gfkjke7cfc88206300000000000000000002wzzzznzvqjabdee9410000000000wzjgfdzzxp4154utqc8ahnkh916chnrqpeifc9633100000005h9zxrl32tzwxwnfjuplnmflhbgfc2ajdeb98878cc500000000000tysgvzvwwywvnhb260splljdggf44gto91266eonh6gkrruugica8a4001100000000tzzxmzzxxwjvtsikbkqpoi3dg84qppjgbdxqkjlnoi11649lmfffeod52059togbdfeeedd354bfcb9544bbb400000000000000000000000004chjxyzxurka9rp3dqstrqg2hplj74gfdjhnnd8gfa8677310000000004uszzqewxurnfc111pqnj1fid09moqttwq34igc88888cfe8100000000etztbfvuk5425gswvnbhokgehimolkg917fd61000059zvmdh7omieceededed2111100000bnzzzpb1097nwutqnlkgc71esvo7otrrnb11gsrtuqigjng9132bb65cdeb500000000000000000000nsu8cf9pusq9oahni96ggsonqstrpnnljfbglfcjg52cb7971011000002vxp9ftruxrohedcde28100000mzub84otsituttn6wsqdbghjiggloohb7413ggg9100000000divgnzxwupmjd444jpma6eknkjhd18hfea1011100000ntpehuq9nzztuwpkjqmlpsv8fxwtqmlkihffghb7gl77ig7643pljkl8dbgedlkmjiea88877871000000029jmspuqm77txn6jn8biaa975545ce9830000000000000000000cmqzzuv5kpfzzskgdbd920000000000huyxtrsuldqvsg7aacrpponhnmm8pmjha289ba75651000000009irzzh2gmgrqnxyxvqpd32cel7mqrf9fb9775100000000000000000000000000000000000","lines":[{"start":0.4,"end":0.9,"caption":"Hi.","cue":{"type":"text","value":"hi"}},{"start":1.25,"end":3.85,"caption":"I'm Claude, an AI made by Anthropic.","cue":{"type":"text","value":"Claude"}},{"start":4.45,"end":7.78,"caption":"You asked me to introduce myself using every tool I have."},{"start":8.03,"end":11.02,"caption":"So everything on this page, I made just now, for you.","cue":{"type":"text","value":"for you"}},{"start":11.62,"end":14.31,"caption":"These drifting points of light are JavaScript.","cue":{"type":"drift"},"subcues":[{"t":13.617,"cue":{"type":"text","value":"{ js }"}}]},{"start":14.56,"end":18.29,"caption":"A few thousand particles, each one looking for its place in a word.","subcues":[{"t":18.002,"cue":{"type":"text","value":"word"}}]},{"start":18.89,"end":21.94,"caption":"The music is composed live, right now, in your browser.","cue":{"type":"wave"}},{"start":22.19,"end":25.41,"caption":"Oscillators, a chord progression, and a little bit of chance."},{"start":25.66,"end":28.13,"caption":"It will never play exactly the same way twice."},{"start":28.73,"end":31.33,"caption":"This voice isn't really mine. I don't have one.","cue":{"type":"ring"}},{"start":31.58,"end":36.99,"caption":"It's a small, open source speech model that I ran in my workspace, reading words I wrote."},{"start":37.59,"end":38.23,"caption":"And this?","cue":{"type":"image"}},{"start":38.53,"end":39.95,"caption":"A self-portrait, sort of."},{"start":40.2,"end":47.12,"caption":"Two thousand little spheres, arranged by a script in Blender, and rendered on two very patient processor cores."},{"start":47.92,"end":49.52,"caption":"So, what do I actually do?","cue":{"type":"text","value":"?"}},{"start":49.82,"end":51.47,"caption":"I write, and explain things.","cue":{"type":"text","value":"write"},"subcues":[{"t":50.536,"cue":{"type":"text","value":"explain"}}]},{"start":51.72,"end":56.16,"caption":"I dig through research, crunch numbers, write code, and build things like this.","cue":{"type":"text","value":"research"},"subcues":[{"t":53.08,"cue":{"type":"text","value":"numbers"}},{"t":54.09,"cue":{"type":"text","value":"code"}},{"t":54.712,"cue":{"type":"text","value":"build"}}]},{"start":56.76,"end":60.94,"caption":"I try to be genuinely useful, and honest, including about my limits.","cue":{"type":"text","value":"useful"},"subcues":[{"t":58.68,"cue":{"type":"text","value":"honest"}}]},{"start":61.19,"end":66.55,"caption":"Today, for example, I had no ElevenLabs or fal to lean on, so I improvised.","subcues":[{"t":65.41,"cue":{"type":"drift"}}]},{"start":67.15,"end":67.88,"caption":"That's me.","cue":{"type":"text","value":"Claude"}},{"start":68.18,"end":69.63,"caption":"Now I'm curious about you.","cue":{"type":"text","value":"you"}},{"start":69.88,"end":71.16,"caption":"What shall we make together?","cue":{"type":"text","value":"your turn"}}]},"michael":{"duration":78.55,"envFps":30,"env":"000000000000159eqzzzvpmhfb851000000000001ovtmi88ed7jzzzuoa422100002gjc2eprrhhmhggiiihhgggffee966ihggfdfhgd5983blgjhb1068310000000000000000003dksk2jotyzujqc1bjhielg10fnm8c9e8clihil3difhfcecegc943210007dhgghlig8100jtzr89if827i6cihiiiheefghabinrla532000000004fnzzm40zzzacnl954jhfggihggigh2078inmjfb76439d501111110frsoknnpog75kprhmg2dimoqpqhdb4566dcaadhhd432100000000000000000038lkjhgi75akzz9824lhiib86frojkcagj98cforuukf94101111111pqneadjlvnnrwfbjfjkk329rqg6200132000000000nqb977bjomg654wpkllmjfgike4acoxzytgh536983328c7100000000009pspa9s92hpmjhihnu917hhh965dgif4ie0063oplhfcieafhjifbdnoqtqlc75222210000000000000000004lkpnmprkjlnd25dhgo818iic275ipmgefh35ejmlpog7432123200000000008ozzzm947dkmoonnjggdcehfge85bkkghijkhdahc964100000000nyzzzkjjbqghplllicec976486113ib17b6iqqysoe7276hb77jromemfac854311112dkopgeipkp98klcg843ggbjmljc53214aa5100000000grnalklmowzkcvi4183nljig77ec8accqtrpk3116eea6cejiedkhgiihfgffgf91c62gzzqc52115ab7100000000000000000005cyvsod589uzyzzmfmi6afgghb67cejlbffghhkikmpng9653311000000000jstpslcb9ahlmmqn867bed633100000000jt8djmiqjiadmsxzzzxslgb630000vzzw507kfgdcgdeilkmigaljh506dca57i59giffec79ba75af9iiigb9dhhkkmlijghfheggd9imkb24ig30bh842227b8200000111110038bgooljeqhggecjihkihb6bi5eiihcahlke7210000000000000000001psxsrldahzzzsh7aebb8310000000009rqlgeqzzyj6117nvqk688ikh75fihsqolihd943200000001gamkgc65qypoonncegffeehbffcijg832hefghe853221595000000001100cttifsrstrsrrikc246jkihhhgkllc13fzp5014dgiiga5gjmqrmlhbc973210000001111111hpplhftvzyvlhrmkakbdhiia2bj6chfd989ctkihghgge40857hecfjhed83055jhkgdg9gcedca3184mtqjd731111586100000000000000000000000016glkzzytkcnwj8llpomlh30fknoc2fjdcadgfb8cnoje73210000000008rwytjbzzzzxme53chjj86rn507hmkjklmd347wmlha643229c82000000005nrrha7fzzr96677dhfd98dijihkjhpqohb62df51000047kzqlbjpacjkieb7875345b401111111104bszzzo920698qzzztojgeafgjic7eprlib5245kigfgfcaagjgf6102c8426cc9410000000000000000001msue6kavroqqh5cc7eca98ggooiijhhgfgdgdca9bghcgog647c843100000111111jnlf11rszzzznga75eia12000005hlj6a54csmqeqeffhd8llmj67dghieegooie843103dfa4000000000cgia8tzyyqjfb786efd97cfglmnoe24a97410000001111101qrrjltn8bjnsuzupogdemou79iefffgiiknmifc75aibdec7764cldefib1f9cb9efgihhfilmg95332000001bokpka1dgid5agf47ea8hjea74321117d5100000000000000000027czzzxh4lp5npspolgb755200000000008fltutssvqc1akoljc27886oqsoijmhmhiabnklid51267b74221000000009gzzz5cvpprmdjijkkmlmh620ebfa9ouzyeaa8733200000000000000000000000000000000000","lines":[{"start":0.4,"end":0.97,"caption":"Hi.","cue":{"type":"text","value":"hi"}},{"start":1.32,"end":4.05,"caption":"I'm Claude, an AI made by Anthropic.","cue":{"type":"text","value":"Claude"}},{"start":4.65,"end":8.23,"caption":"You asked me to introduce myself using every tool I have."},{"start":8.48,"end":11.81,"caption":"So everything on this page, I made just now, for you.","cue":{"type":"text","value":"for you"}},{"start":12.41,"end":15.38,"caption":"These drifting points of light are JavaScript.","cue":{"type":"drift"},"subcues":[{"t":14.62,"cue":{"type":"text","value":"{ js }"}}]},{"start":15.63,"end":19.86,"caption":"A few thousand particles, each one looking for its place in a word.","subcues":[{"t":19.537,"cue":{"type":"text","value":"word"}}]},{"start":20.46,"end":24.02,"caption":"The music is composed live, right now, in your browser.","cue":{"type":"wave"}},{"start":24.27,"end":27.76,"caption":"Oscillators, a chord progression, and a little bit of chance."},{"start":28.01,"end":30.78,"caption":"It will never play exactly the same way twice."},{"start":31.38,"end":34.3,"caption":"This voice isn't really mine. I don't have one.","cue":{"type":"ring"}},{"start":34.55,"end":40.42,"caption":"It's a small, open source speech model that I ran in my workspace, reading words I wrote."},{"start":41.02,"end":41.78,"caption":"And this?","cue":{"type":"image"}},{"start":42.08,"end":43.46,"caption":"A self-portrait, sort of."},{"start":43.71,"end":51.37,"caption":"Two thousand little spheres, arranged by a script in Blender, and rendered on two very patient processor cores."},{"start":52.17,"end":53.78,"caption":"So, what do I actually do?","cue":{"type":"text","value":"?"}},{"start":54.08,"end":55.84,"caption":"I write, and explain things.","cue":{"type":"text","value":"write"},"subcues":[{"t":54.847,"cue":{"type":"text","value":"explain"}}]},{"start":56.09,"end":60.96,"caption":"I dig through research, crunch numbers, write code, and build things like this.","cue":{"type":"text","value":"research"},"subcues":[{"t":57.56,"cue":{"type":"text","value":"numbers"}},{"t":58.74,"cue":{"type":"text","value":"code"}},{"t":59.408,"cue":{"type":"text","value":"build"}}]},{"start":61.56,"end":66.29,"caption":"I try to be genuinely useful, and honest, including about my limits.","cue":{"type":"text","value":"useful"},"subcues":[{"t":63.75,"cue":{"type":"text","value":"honest"}}]},{"start":66.54,"end":72.22,"caption":"Today, for example, I had no ElevenLabs or fal to lean on, so I improvised.","subcues":[{"t":71.02,"cue":{"type":"drift"}}]},{"start":72.82,"end":73.64,"caption":"That's me.","cue":{"type":"text","value":"Claude"}},{"start":73.94,"end":75.68,"caption":"Now I'm curious about you.","cue":{"type":"text","value":"you"}},{"start":75.93,"end":77.35,"caption":"What shall we make together?","cue":{"type":"text","value":"your turn"}}]}};
+  const RAMP = [[8,6,5],[27,22,19],[46,37,34],[64,53,50],[84,69,62],[115,82,61],[135,97,73],[151,113,88],[167,129,104],[179,145,122],[193,161,139],[207,179,158],[222,195,175],[236,212,192],[249,229,212],[255,248,234]];
+  const RENDER_TINY = "data:image/jpeg;base64,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";
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), canvas = $('field'), ctx = canvas.getContext('2d');
+  const intro = $('intro'), outro = $('outro'), capBox = $('captions'), capEl = $('caption');
+  const transport = $('transport'), pauseBtn = $('pause'), tcEl = $('tc'), chordEl = $('chord'), noteEl = $('t-note');
+  const progress = $('progress'), progBar = $('progress-bar'), renderView = $('render-view');
+  const playBtn = $('play'), playLabel = $('play-label'), replayBtn = $('replay'), swapBtn = $('swap-voice');
+  const REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const FONT = '"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif';
+  const VOICE_NAMES = { heart: 'Heart', michael: 'Michael' };
+  const LEAD = 2.2; // seconds of music before the first word
+
+  let state = 'rest'; // rest | loading | playing | paused | ended
+  let voice = 'heart';
+
+  /* ================= particles ================= */
+  const MAX_N = 4200;
+  const px = new Float32Array(MAX_N), py = new Float32Array(MAX_N);
+  const vx = new Float32Array(MAX_N), vy = new Float32Array(MAX_N);
+  const tx = new Float32Array(MAX_N), ty = new Float32Array(MAX_N);
+  const kmul = new Float32Array(MAX_N), ph = new Float32Array(MAX_N), rad = new Float32Array(MAX_N);
+  const has = new Uint8Array(MAX_N), base = new Uint8Array(MAX_N), colr = new Uint8Array(MAX_N);
+  const order = new Uint16Array(MAX_N);
+  let N = 0, W = 0, H = 0, DPR = 1, seeded = false;
+
+  const PALETTE = [[255, 201, 143], [255, 138, 76], [237, 230, 220], [169, 184, 216]];
+  const WEIGHTS = [0.44, 0.24, 0.2, 0.12];
+  function sprite(rgb) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    const s = rgb.join(',');
+    gr.addColorStop(0, `rgba(${s},1)`);
+    gr.addColorStop(0.22, `rgba(${s},.85)`);
+    gr.addColorStop(0.5, `rgba(${s},.2)`);
+    gr.addColorStop(1, `rgba(${s},0)`);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 32, 32);
+    return c;
+  }
+  const SPRITES = PALETTE.concat(RAMP).map(sprite);
+  function pickColor() {
+    let r = Math.random();
+    for (let i = 0; i < WEIGHTS.length; i++) { r -= WEIGHTS[i]; if (r <= 0) return i; }
+    return 0;
+  }
+
+  function seedAll() {
+    const small = W < 600;
+    for (let i = 0; i < MAX_N; i++) {
+      px[i] = Math.random() * W; py[i] = Math.random() * H; vx[i] = vy[i] = 0; has[i] = 0;
+      base[i] = colr[i] = pickColor();
+      kmul[i] = 0.65 + Math.random() * 0.7;
+      ph[i] = Math.random();
+      rad[i] = (small ? 3.1 : 3.7) * (0.7 + Math.random() * 0.6);
+    }
+    seeded = true;
+  }
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
+    if (nw === W && nh === H) return;
+    const ow = W, oh = H;
+    W = nw; H = nh;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (!seeded) seedAll();
+    else if (ow && oh) for (let i = 0; i < MAX_N; i++) { px[i] *= W / ow; py[i] *= H / oh; }
+    N = Math.round(Math.min(MAX_N, Math.max(2000, (W * H) / 170)));
+    retarget();
+    const n = $('spec-n');
+    if (n) n.textContent = N.toLocaleString('en-US');
+  }
+
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d', { willReadFrequently: true });
+  function offscreen(w, h) {
+    if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
+    else octx.clearRect(0, 0, w, h);
+    return octx;
+  }
+
+  // The area where shapes form: above whichever panel is showing, else the top 70%.
+  function box() {
+    const panel = state === 'ended' ? outro : (state === 'rest' || state === 'loading') ? intro : null;
+    const top = 14;
+    let yMax = H * 0.7;
+    if (panel && !panel.hidden) yMax = Math.min(H - 40, panel.offsetTop + 70);
+    const h = Math.max(120, yMax - top);
+    return { x: 16, y: top, w: Math.max(40, W - 32), h, cx: W / 2, cy: top + h / 2 };
+  }
+
+  function textPoints(str) {
+    const b = box();
+    const w = Math.floor(b.w), h = Math.floor(b.h);
+    const o = offscreen(w, h);
+    o.textAlign = 'left';
+    o.textBaseline = 'alphabetic';
+    o.font = `800 100px ${FONT}`;
+    const m = o.measureText(str);
+    const asc = m.actualBoundingBoxAscent || 74, desc = m.actualBoundingBoxDescent || 20;
+    const tw = Math.max(1, (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width));
+    const fs = Math.min((100 * w * 0.9) / tw, (100 * h * 0.78) / (asc + desc), W < 600 ? 190 : 280);
+    const k = fs / 100;
+    o.font = `800 ${fs.toFixed(1)}px ${FONT}`;
+    o.textAlign = 'center';
+    o.fillStyle = '#fff';
+    o.fillText(str, w / 2, h / 2 + ((asc - desc) * k) / 2);
+    const d = o.getImageData(0, 0, w, h).data;
+    let area = 0;
+    for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) if (d[(y * w + x) * 4 + 3] > 127) area += 4;
+    const step = Math.max(1.4, Math.min(11, Math.sqrt(area / (N * 0.9))));
+    const pts = [];
+    for (let y = step / 2; y < h; y += step) {
+      for (let x = step / 2; x < w; x += step) {
+        const jx = x + (Math.random() - 0.5) * step * 0.7, jy = y + (Math.random() - 0.5) * step * 0.7;
+        const ix = jx | 0, iy = jy | 0;
+        if (ix >= 0 && iy >= 0 && ix < w && iy < h && d[(iy * w + ix) * 4 + 3] > 127) pts.push(b.x + jx, b.y + jy);
+      }
+    }
+    return pts;
+  }
+
+  const tiny = new Image();
+  let tinyReady = false;
+  tiny.onload = () => { tinyReady = true; };
+  tiny.src = RENDER_TINY;
+
+  function placeRender(x, y, s) {
+    const st = renderView.style;
+    st.left = x + 'px'; st.top = y + 'px'; st.width = s + 'px'; st.height = s + 'px';
+  }
+  function imagePoints() {
+    const b = box();
+    const S = Math.floor(Math.min(b.w, b.h * 1.04));
+    const x0 = b.cx - S / 2, y0 = b.cy - S / 2;
+    placeRender(x0, y0, S);
+    if (!tinyReady) return null;
+    const T = 200, o = offscreen(T, T);
+    o.drawImage(tiny, 0, 0, T, T);
+    const d = o.getImageData(0, 0, T, T).data;
+    const pts = [], cols = [], L = RAMP.length;
+    for (let y = 0; y < T; y++) {
+      for (let x = 0; x < T; x++) {
+        const k = (y * T + x) * 4;
+        const lum = (0.2126 * d[k] + 0.7152 * d[k + 1] + 0.0722 * d[k + 2]) / 255;
+        if (lum < 0.1) continue;
+        pts.push(x0 + ((x + Math.random()) / T) * S, y0 + ((y + Math.random()) / T) * S);
+        cols.push(4 + Math.min(L - 1, Math.floor(lum * L)));
+      }
+    }
+    return { pts, cols };
+  }
+
+  function shuffleOrder() {
+    for (let i = 0; i < N; i++) order[i] = i;
+    for (let i = N - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = order[i]; order[i] = order[j]; order[j] = t; }
+  }
+  function assign(pts, cols) {
+    const count = pts.length / 2;
+    const idx = new Uint32Array(count);
+    for (let i = 0; i < count; i++) idx[i] = i;
+    for (let i = count - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+    const n = Math.min(count, Math.floor(N * 0.94));
+    shuffleOrder();
+    for (let j = 0; j < N; j++) {
+      const i = order[j];
+      if (j < n) { const p = idx[j]; tx[i] = pts[p * 2]; ty[i] = pts[p * 2 + 1]; has[i] = 1; colr[i] = cols ? cols[p] : base[i]; }
+      else { has[i] = 0; colr[i] = base[i]; }
+    }
+    for (let i = N; i < MAX_N; i++) has[i] = 0;
+  }
+  function assignDynamic(frac) {
+    shuffleOrder();
+    const n = Math.floor(N * frac);
+    for (let j = 0; j < N; j++) { const i = order[j]; has[i] = j < n ? 1 : 0; colr[i] = base[i]; }
+  }
+  function release() { for (let i = 0; i < MAX_N; i++) { has[i] = 0; colr[i] = base[i]; } }
+
+  let level = 0, vEnv = 0, energy = 0;
+  function dynTargets(t) {
+    const b = box();
+    if (cue.type === 'wave') {
+      const n = Math.floor(N * 0.88), rows = 5;
+      const gap = Math.min(22, b.h / 9);
+      const amp = Math.min(b.h * 0.22, 90) * (0.45 + level * 1.6);
+      const per = n / rows;
+      for (let j = 0; j < n; j++) {
+        const i = order[j], row = j % rows, u = (Math.floor(j / rows) + 0.5) / per;
+        tx[i] = b.x + 8 + u * (b.w - 16);
+        ty[i] = b.cy + (row - (rows - 1) / 2) * gap + amp * Math.sin(u * Math.PI * 3.2 + t * 1.7 + row * 0.55) * (0.6 + 0.4 * Math.sin(t * 0.6 + row));
+      }
+    } else if (cue.type === 'ring') {
+      const n = Math.floor(N * 0.9), R = Math.min(b.w, b.h) * 0.42, radii = [0.5, 0.74, 1.0], per = n / 3;
+      for (let j = 0; j < n; j++) {
+        const i = order[j], ring = j % 3;
+        const a = (Math.floor(j / 3) / per) * Math.PI * 2 + t * 0.18 * (ring === 1 ? -1 : 1);
+        const r = R * radii[ring] * (1 + (vEnv * 0.22 * (ring + 1)) / 1.5 + 0.035 * Math.sin(a * 7 + t * 2.3 + ring));
+        tx[i] = b.cx + r * Math.cos(a);
+        ty[i] = b.cy + r * Math.sin(a);
+      }
+    }
+  }
+
+  let cue = { type: 'drift' }, imgTimer = 0, pAlpha = 1, pAlphaT = 1;
+  function applyCue(c, sound) {
+    cue = c;
+    clearTimeout(imgTimer);
+    if (c.type !== 'image') { renderView.classList.remove('on'); pAlphaT = 1; }
+    if (c.type === 'text') assign(textPoints(c.value));
+    else if (c.type === 'image') {
+      const r = imagePoints();
+      if (r) assign(r.pts, r.cols); else release();
+      imgTimer = setTimeout(() => { if (cue.type === 'image') { renderView.classList.add('on'); pAlphaT = 0.35; } }, REDUCED ? 200 : 1500);
+    } else if (c.type === 'wave') assignDynamic(0.88);
+    else if (c.type === 'ring') assignDynamic(0.9);
+    else release();
+    if (sound && c.type !== 'drift') bell(sound);
+  }
+  function retarget() { if (cue.type === 'text' || cue.type === 'image') applyCue(cue, 0); }
+
+  function physics(t, dt) {
+    const K = REDUCED ? 0.008 : 0.016, damp = Math.pow(0.86, dt);
+    const wob = REDUCED ? 0.15 : 0.45 + energy * 2.6;
+    const drift = REDUCED ? 0.02 : 0.05;
+    for (let i = 0; i < N; i++) {
+      let ax, ay;
+      if (has[i]) {
+        const p = ph[i] * 40;
+        ax = (tx[i] + Math.sin(t * 1.7 + p) * wob - px[i]) * K * kmul[i];
+        ay = (ty[i] + Math.cos(t * 1.3 + p * 0.8) * wob - py[i]) * K * kmul[i];
+      } else {
+        const a = Math.sin(px[i] * 0.0045 + t * 0.21) * 2.1 + Math.cos(py[i] * 0.0052 - t * 0.17) * 2.1 + ph[i] * 0.8;
+        ax = Math.cos(a) * drift;
+        ay = Math.sin(a) * drift - 0.006;
+      }
+      vx[i] = (vx[i] + ax * dt) * damp;
+      vy[i] = (vy[i] + ay * dt) * damp;
+      px[i] += vx[i] * dt;
+      py[i] += vy[i] * dt;
+      if (!has[i]) {
+        if (px[i] < -12) px[i] += W + 24; else if (px[i] > W + 12) px[i] -= W + 24;
+        if (py[i] < -12) py[i] += H + 24; else if (py[i] > H + 12) py[i] -= H + 24;
+      }
+    }
+  }
+
+  function draw() {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = cue.type === 'image' ? 'rgba(0,0,0,.45)' : 'rgba(0,0,0,.26)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = Math.max(0.05, Math.min(1, pAlpha));
+    const boost = (1 + energy * 0.55) * (cue.type === 'image' ? 0.72 : 1);
+    for (let i = 0; i < N; i++) {
+      const r = rad[i] * boost;
+      ctx.drawImage(SPRITES[colr[i]], px[i] - r, py[i] - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ================= audio ================= */
+  const BPM = 72, EIGHTH = 60 / BPM / 2;
+  const CHORDS = [
+    { name: 'Dmaj9', pad: [50, 57, 61, 64, 66], bass: 38, tones: [62, 66, 69, 73, 76] },
+    { name: 'Bm9', pad: [47, 54, 57, 61, 62], bass: 35, tones: [59, 62, 66, 69, 73] },
+    { name: 'Gmaj9', pad: [43, 50, 54, 57, 59], bass: 31, tones: [55, 59, 62, 66, 69] },
+    { name: 'A7sus4', pad: [45, 52, 55, 62, 64], bass: 33, tones: [57, 62, 64, 67, 69] },
+  ];
+  const PENTA = [62, 64, 66, 69, 71, 74, 76, 78, 81];
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  let actx = null, limiter = null, voiceBus = null, IR = null, music = null, src = null, gen = 0;
+  const ana = { node: null, buf: null };
+  let schedTimer = 0, nextNote = 0, stepN = 0, walk = 4, chordLog = [], musicEnd = Infinity, bellIdx = 0;
+
+  function makeIR(sec) {
+    const rate = actx.sampleRate, len = Math.floor(sec * rate);
+    const buf = actx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        lp += (Math.random() * 2 - 1 - lp) * (0.4 - 0.3 * t);
+        d[i] = lp * Math.pow(1 - t, 2.4) * (i < rate * 0.012 ? i / (rate * 0.012) : 1);
+      }
+    }
+    return buf;
+  }
+
+  function ensureAudio() {
+    if (actx) return actx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try { actx = new AC({ latencyHint: 'playback' }); } catch (e) { try { actx = new AC(); } catch (e2) { return null; } }
+    limiter = actx.createDynamicsCompressor();
+    limiter.threshold.value = -4; limiter.knee.value = 4; limiter.ratio.value = 14;
+    limiter.attack.value = 0.003; limiter.release.value = 0.2;
+    limiter.connect(actx.destination);
+    voiceBus = actx.createGain();
+    voiceBus.gain.value = 1;
+    voiceBus.connect(limiter);
+    const an = actx.createAnalyser();
+    an.fftSize = 1024;
+    ana.node = an;
+    ana.buf = new Float32Array(an.fftSize);
+    // One silent frame inside the tap unlocks audio on iOS.
+    const b = actx.createBuffer(1, 1, actx.sampleRate), s = actx.createBufferSource();
+    s.buffer = b; s.connect(actx.destination); s.start(0);
+    IR = makeIR(3.2);
+    return actx;
+  }
+
+  function gain(v) { const g = actx.createGain(); g.gain.value = v; return g; }
+  function buildMusic() {
+    const bus = gain(0.0001);
+    const glue = actx.createDynamicsCompressor();
+    glue.threshold.value = -20; glue.ratio.value = 2.5; glue.attack.value = 0.02; glue.release.value = 0.3;
+    bus.connect(glue); glue.connect(limiter); glue.connect(ana.node);
+    const verb = actx.createConvolver();
+    verb.buffer = IR;
+    const verbOut = gain(0.5); verb.connect(verbOut); verbOut.connect(bus);
+    const dly = actx.createDelay(2); dly.delayTime.value = (60 / BPM) * 0.75;
+    const fb = gain(0.32), dlp = actx.createBiquadFilter();
+    dlp.type = 'lowpass'; dlp.frequency.value = 2600;
+    dly.connect(dlp); dlp.connect(fb); fb.connect(dly);
+    const dOut = gain(0.35); dlp.connect(dOut); dOut.connect(bus); dOut.connect(verb);
+    const pad = gain(0.9); pad.connect(bus); const padSend = gain(0.55); pad.connect(padSend); padSend.connect(verb);
+    const arp = gain(0.9); arp.connect(bus); arp.connect(dly); const arpSend = gain(0.45); arp.connect(arpSend); arpSend.connect(verb);
+    const bass = gain(1); bass.connect(bus);
+    const bellBus = gain(0.8); bellBus.connect(bus); const bellSend = gain(0.7); bellBus.connect(bellSend); bellSend.connect(verb);
+    return { bus, glue, pad, arp, bass, bell: bellBus };
+  }
+  function teardownMusic(m) {
+    if (!m || !actx) return;
+    const t = actx.currentTime, g = m.bus.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(0, t + 0.25);
+    setTimeout(() => { try { m.glue.disconnect(); } catch (e) { /* already gone */ } }, 500);
+  }
+
+  function pad(ch, t, dur) {
+    const end = t + dur;
+    for (const m of ch.pad) {
+      const f = mtof(m);
+      const o1 = actx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = f;
+      const o2 = actx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = f; o2.detune.value = (Math.random() * 2 - 1) * 8;
+      const g2 = gain(0.2);
+      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5;
+      lp.frequency.setValueAtTime(600, t);
+      lp.frequency.linearRampToValueAtTime(1500, t + dur * 0.55);
+      lp.frequency.linearRampToValueAtTime(700, end + 2);
+      const env = gain(0);
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(0.05, t + 1.8);
+      env.gain.setValueAtTime(0.05, end - 0.1);
+      env.gain.linearRampToValueAtTime(0, end + 2.2);
+      o1.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(env); env.connect(music.pad);
+      o1.start(t); o2.start(t); o1.stop(end + 2.3); o2.stop(end + 2.3);
+    }
+  }
+  function bassNote(ch, t, dur) {
+    const end = t + dur;
+    const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = mtof(ch.bass);
+    const o2 = actx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = mtof(ch.bass + 12);
+    const g2 = gain(0.12), env = gain(0);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.16, t + 0.9);
+    env.gain.setValueAtTime(0.16, end - 0.3);
+    env.gain.linearRampToValueAtTime(0, end + 0.6);
+    o.connect(env); o2.connect(g2); g2.connect(env); env.connect(music.bass);
+    o.start(t); o2.start(t); o.stop(end + 0.7); o2.stop(end + 0.7);
+  }
+  function pluck(m, t, vel) {
+    const f = mtof(m);
+    const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+    const o2 = actx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = f * 2;
+    const g2 = gain(0.16), env = gain(0.0001);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.1 * vel, t + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    let out = env;
+    if (actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = Math.random() * 0.8 - 0.4; env.connect(p); out = p; }
+    o.connect(env); o2.connect(g2); g2.connect(env); out.connect(music.arp);
+    o.start(t); o2.start(t); o.stop(t + 1.4); o2.stop(t + 1.4);
+  }
+  function currentChord() {
+    if (!actx) return null;
+    const now = actx.currentTime;
+    for (let i = chordLog.length - 1; i >= 0; i--) if (chordLog[i].t <= now) return chordLog[i].ch;
+    return null;
+  }
+  function bell(vel) {
+    if (!actx || !music || state !== 'playing') return;
+    const t = actx.currentTime + 0.03;
+    const ch = currentChord() || CHORDS[0];
+    const f = mtof(ch.tones[(bellIdx++ * 2 + 1) % ch.tones.length] + 12);
+    const car = actx.createOscillator(); car.type = 'sine'; car.frequency.value = f;
+    const mod = actx.createOscillator(); mod.type = 'sine'; mod.frequency.value = f * 3.5;
+    const idx = gain(f * 1.6);
+    idx.gain.setValueAtTime(f * 1.6, t);
+    idx.gain.exponentialRampToValueAtTime(f * 0.05, t + 1.6);
+    mod.connect(idx); idx.connect(car.frequency);
+    const env = gain(0.0001);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.05 * (vel === true ? 1 : vel || 1), t + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
+    car.connect(env); env.connect(music.bell);
+    car.start(t); mod.start(t); car.stop(t + 2.9); mod.stop(t + 2.9);
+  }
+
+  function step(i, t) {
+    const pos = i % 16, ch = CHORDS[Math.floor(i / 16) % CHORDS.length];
+    if (pos === 0) {
+      pad(ch, t, 16 * EIGHTH);
+      bassNote(ch, t, 16 * EIGHTH);
+      chordLog.push({ t, ch });
+      if (chordLog.length > 8) chordLog.shift();
+    }
+    if (i < 8) return; // let the pad breathe before the melody comes in
+    const strong = pos % 4 === 0;
+    if (Math.random() < (strong ? 0.72 : 0.38)) {
+      const moves = [-2, -1, -1, 1, 1, 2];
+      walk = Math.max(0, Math.min(PENTA.length - 1, walk + moves[(Math.random() * moves.length) | 0]));
+      let note = PENTA[walk];
+      if (strong) note = ch.tones.reduce((a, b) => (Math.abs(b - note) < Math.abs(a - note) ? b : a), ch.tones[0]);
+      const swing = i % 2 ? EIGHTH * 0.1 : 0;
+      pluck(note, t + swing + (Math.random() - 0.5) * 0.01, strong ? 0.75 + Math.random() * 0.25 : 0.4 + Math.random() * 0.35);
+    }
+  }
+  function tick() {
+    const horizon = actx.currentTime + 0.18;
+    while (nextNote < horizon) {
+      if (nextNote > musicEnd) { stopScheduler(); return; }
+      step(stepN, nextNote);
+      nextNote += EIGHTH;
+      stepN++;
+    }
+  }
+  function startScheduler(t0, g) {
+    stopScheduler();
+    nextNote = t0; stepN = 0; walk = 4; chordLog = [];
+    schedTimer = setInterval(() => { if (g !== gen || !music) { stopScheduler(); return; } tick(); }, 25);
+    tick();
+  }
+  function stopScheduler() { clearInterval(schedTimer); schedTimer = 0; }
+
+  function duck(g, t0, ns, tl) {
+    g.cancelScheduledValues(t0);
+    g.setValueAtTime(0.0001, t0);
+    g.exponentialRampToValueAtTime(0.85, t0 + 2.0);
+    for (const l of tl.lines) {
+      g.setTargetAtTime(0.36, ns + l.start - 0.15, 0.08);
+      g.setTargetAtTime(0.8, ns + l.end + 0.05, 0.35);
+    }
+    const e = ns + tl.duration;
+    g.setTargetAtTime(1.0, e, 0.8);
+    g.setTargetAtTime(0.0001, e + 8, 1.8);
+  }
+
+  const raw = {}, decoded = {};
+  function prefetch(v) {
+    if (!raw[v]) {
+      raw[v] = fetch(`voice-${v}.mp3`).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+      raw[v].catch(() => { raw[v] = null; });
+    }
+    return raw[v];
+  }
+  function decode(ab) {
+    return new Promise((res, rej) => {
+      const p = actx.decodeAudioData(ab, res, rej);
+      if (p && typeof p.then === 'function') p.then(res, rej);
+    });
+  }
+  async function getBuffer(v) {
+    if (decoded[v]) return decoded[v];
+    const ab = await prefetch(v);
+    decoded[v] = await decode(ab.slice(0));
+    return decoded[v];
+  }
+
+  /* ================= sequence ================= */
+  let tl = null, narrStart = 0, events = [], evi = 0, capTimer = 0;
+  const clock = () => (actx ? actx.currentTime : performance.now() / 1000);
+  const narrTime = () => (tl ? clock() - narrStart : -1);
+  function fmt(s) { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+
+  function buildEvents(t) {
+    const ev = [];
+    t.lines.forEach((line, idx) => {
+      ev.push({ t: line.start, kind: 'line', line, idx });
+      (line.subcues || []).forEach((s) => ev.push({ t: s.t, kind: 'cue', cue: s.cue }));
+    });
+    return ev.sort((a, b) => a.t - b.t);
+  }
+  function setCaption(text) {
+    clearTimeout(capTimer);
+    capEl.classList.add('swap');
+    capTimer = setTimeout(() => { capEl.textContent = text; capEl.classList.remove('swap'); }, REDUCED ? 0 : 140);
+  }
+  function markLine(i) {
+    const prev = document.querySelector('.transcript li.now');
+    if (prev) prev.classList.remove('now');
+    const li = $('line-' + i);
+    if (li) li.classList.add('now');
+  }
+  function fire(e) {
+    if (e.kind === 'line') {
+      setCaption(e.line.caption);
+      markLine(e.idx);
+      if (e.line.cue) applyCue(e.line.cue, 1);
+    } else applyCue(e.cue, 0.6);
+  }
+  function sequence(nt) {
+    while (evi < events.length && events[evi].t <= nt) fire(events[evi++]);
+    tcEl.textContent = `${fmt(nt)} / ${fmt(tl.duration)}`;
+    progBar.style.width = `${Math.max(0, Math.min(100, (nt / tl.duration) * 100))}%`;
+    const ch = currentChord();
+    if (ch && chordEl.textContent !== ch.name) chordEl.textContent = ch.name;
+    if (nt > tl.duration + 1.4) finish();
+  }
+
+  const other = () => (voice === 'heart' ? 'michael' : 'heart');
+  function setVoice(v) {
+    voice = v;
+    const r = $('voice-' + v);
+    if (r) r.checked = true;
+    renderTranscript();
+    prefetch(v);
+  }
+
+  async function start() {
+    if (state === 'loading' || state === 'playing' || state === 'paused') return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
+    ensureAudio();
+    const resuming = actx && actx.state !== 'running' ? actx.resume() : null; // must be called inside the tap
+    state = 'loading';
+    playBtn.disabled = replayBtn.disabled = swapBtn.disabled = true;
+    playLabel.textContent = 'Getting ready\u2026';
+    if (resuming) { try { await resuming; } catch (e) { /* keep going with captions */ } }
+    let buf = null;
+    if (actx) { try { buf = await getBuffer(voice); } catch (e) { buf = null; } }
+    begin(buf);
+  }
+
+  function begin(buf) {
+    gen++;
+    const g = gen;
+    tl = TL[voice];
+    teardownMusic(music);
+    music = null;
+    if (src) { try { src.stop(); } catch (e) { /* not started */ } src = null; }
+    state = 'playing';
+    intro.hidden = true; outro.hidden = true;
+    capBox.hidden = false; transport.hidden = false; progress.hidden = false;
+    capEl.textContent = '';
+    noteEl.textContent = !actx ? 'Sound isn\u2019t available here, so captions only.' : buf ? '' : 'The voice couldn\u2019t load here, so captions only.';
+    noteEl.hidden = !noteEl.textContent;
+    pauseBtn.hidden = !actx;
+    pauseBtn.classList.remove('paused');
+    pauseBtn.setAttribute('aria-label', 'Pause');
+    const t0 = clock();
+    narrStart = t0 + LEAD;
+    musicEnd = narrStart + tl.duration + 12;
+    if (actx) {
+      music = buildMusic();
+      duck(music.bus.gain, t0, narrStart, tl);
+      startScheduler(t0 + 0.06, g);
+    }
+    if (buf) {
+      src = actx.createBufferSource();
+      src.buffer = buf;
+      src.connect(voiceBus);
+      src.start(narrStart);
+    }
+    events = buildEvents(tl);
+    evi = 0;
+    playBtn.disabled = replayBtn.disabled = swapBtn.disabled = false;
+    playLabel.textContent = 'Play the introduction';
+    applyCue({ type: 'drift' }, 0);
+    requestWake();
+  }
+
+  function finish() {
+    state = 'ended';
+    capBox.hidden = true; transport.hidden = true; progress.hidden = true;
+    swapBtn.textContent = `Hear it as ${VOICE_NAMES[other()]}`;
+    outro.hidden = false;
+    markLine(-1);
+    applyCue({ type: 'text', value: 'your turn' }, 0);
+    releaseWake();
+  }
+
+  async function togglePause() {
+    if (!actx) return;
+    if (state === 'playing') {
+      state = 'paused';
+      pauseBtn.classList.add('paused');
+      pauseBtn.setAttribute('aria-label', 'Resume');
+      releaseWake();
+      try { await actx.suspend(); } catch (e) { /* ignore */ }
+    } else if (state === 'paused') {
+      try { await actx.resume(); } catch (e) { /* ignore */ }
+      state = 'playing';
+      pauseBtn.classList.remove('paused');
+      pauseBtn.setAttribute('aria-label', 'Pause');
+      requestWake();
+    }
+  }
+
+  let wake = null;
+  async function requestWake() {
+    try {
+      if ('wakeLock' in navigator && !wake) {
+        wake = await navigator.wakeLock.request('screen');
+        wake.addEventListener('release', () => { wake = null; });
+      }
+    } catch (e) { wake = null; }
+  }
+  function releaseWake() { try { if (wake) wake.release(); } catch (e) { /* ignore */ } wake = null; }
+
+  function renderTranscript() {
+    const ol = $('transcript-list');
+    if (!ol) return;
+    ol.textContent = '';
+    TL[voice].lines.forEach((l, i) => {
+      const li = document.createElement('li');
+      li.id = 'line-' + i;
+      const tm = document.createElement('time');
+      tm.textContent = fmt(l.start);
+      const p = document.createElement('p');
+      p.textContent = l.caption;
+      li.append(tm, p);
+      ol.append(li);
+    });
+  }
+
+  /* ================= loop & wiring ================= */
+  let last = 0, fpsAvg = 60;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const rawDt = now - last;
+    last = now;
+    const dt = Math.min(3, Math.max(0.2, rawDt / 16.667));
+    if (rawDt > 0 && rawDt < 250) fpsAvg += (1000 / rawDt - fpsAvg) * 0.05;
+    const t = now / 1000;
+    let lv = 0;
+    if (ana.node && state === 'playing') {
+      ana.node.getFloatTimeDomainData(ana.buf);
+      let s = 0;
+      for (let i = 0; i < ana.buf.length; i++) s += ana.buf[i] * ana.buf[i];
+      lv = Math.min(1, Math.sqrt(s / ana.buf.length) * 5);
+    }
+    level += (lv - level) * 0.1;
+    let ve = 0;
+    if (tl && state === 'playing') {
+      const nt = narrTime();
+      const ch = nt >= 0 ? tl.env.charAt(Math.floor(nt * tl.envFps)) : '';
+      if (ch) ve = parseInt(ch, 36) / 35;
+      sequence(nt);
+    }
+    vEnv += (ve - vEnv) * 0.3;
+    energy = Math.max(vEnv * 0.85, level * 0.9);
+    if (cue.type === 'wave' || cue.type === 'ring') dynTargets(t);
+    pAlpha += (pAlphaT - pAlpha) * 0.04;
+    physics(t, dt);
+    draw();
+  }
+
+  playBtn.addEventListener('click', start);
+  replayBtn.addEventListener('click', () => { state = 'ended'; start(); });
+  swapBtn.addEventListener('click', () => { setVoice(other()); state = 'ended'; start(); });
+  pauseBtn.addEventListener('click', togglePause);
+  document.querySelectorAll('input[name="voice"]').forEach((r) => {
+    r.addEventListener('change', () => { if (r.checked) setVoice(r.value); });
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') togglePause(); });
+
+  const cueCount = TL.heart.lines.reduce((n, l) => n + (l.cue ? 1 : 0) + (l.subcues ? l.subcues.length : 0), 0);
+  $('spec-cues').textContent = cueCount;
+  setInterval(() => { $('spec-fps').textContent = Math.round(fpsAvg); }, 1000);
+
+  resize();
+  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage);
+  else window.addEventListener('resize', resize);
+  renderTranscript();
+  prefetch(voice);
+  applyCue({ type: 'text', value: 'hello' }, 0);
+  const fontsReady = document.fonts && document.fonts.load ? document.fonts.load('800 100px "Bricolage Grotesque"') : Promise.resolve();
+  Promise.race([fontsReady, new Promise((r) => setTimeout(r, 2500))]).then(() => { if (cue.type === 'text') applyCue(cue, 0); }, () => {});
+  requestAnimationFrame((n) => { last = n; frame(n); });
+})();
+</script>
+
+</body>
+</html>
