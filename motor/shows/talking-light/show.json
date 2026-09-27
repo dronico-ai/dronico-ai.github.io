@@ -1,0 +1,10 @@
+{
+  "slug": "talking-light",
+  "languages": {
+    "en": { "script": "guion.en.md", "voices": ["af_heart", "am_michael"] },
+    "es": { "script": "guion.es.md", "voices": ["ef_dora", "em_alex"] }
+  },
+  "images": { "portrait": "portrait.jpg" },
+  "speed": 0.95,
+  "landing_image": "portrait"
+}

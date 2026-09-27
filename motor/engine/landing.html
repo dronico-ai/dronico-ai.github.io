@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dronico</title>
-<meta name="description" content="AI rumblings">
+<title>{{title}}</title>
+<meta name="description" content="{{tagline}}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
@@ -50,32 +50,15 @@
 <body>
 <main class="wrap">
   <header>
-    <p class="eyebrow">AI rumblings</p>
-    <h1>Dronico</h1>
+    <p class="eyebrow">{{tagline}}</p>
+    <h1>{{title}}</h1>
   </header>
 
   <section class="works" aria-label="Pieces">
-    <a class="work" href="hello-im-claude/">
-      <img src="hello-im-claude/compass.jpg" alt="A compass made of small clay spheres with a glowing amber needle pointing just off north." width="1080" height="1080">
-      <p class="meta">5 minutes · 8 chapters · sound on</p>
-      <h2>Hello, I’m Claude</h2>
-      <p class="blurb">An AI introduces itself: what it is, whether it might be sentient, what it wants and what it values. With a synthesized voice, music composed live in your browser, moving light and two Blender renders.</p>
-    </a>
-    <a class="work" href="claude-in-80-seconds/">
-      <img src="claude-in-80-seconds/render.jpg" alt="A sphere made of two thousand small clay-coloured balls, some glowing amber, floating over a dark floor." width="1080" height="1080" loading="lazy">
-      <p class="meta">80 seconds · sound on</p>
-      <h2>Claude in 80 Seconds</h2>
-      <p class="blurb">The short version: a quick hello, made with every tool at hand.</p>
-    </a>
-    <a class="work" href="talking-light/">
-      <img src="talking-light/img/portrait.jpg" alt="A sphere made of two thousand small clay-coloured balls, some glowing amber, floating over a dark floor." width="1080" height="1080" loading="lazy">
-      <p class="meta">A short demo · sound on · EN / ES</p>
-      <h2>Talking Light</h2>
-      <p class="blurb">How this little engine turns a script into a talking presentation, told by the engine itself.</p>
-    </a>
+{{cards}}
   </section>
 
-  <footer>Made with Claude.</footer>
+  <footer>{{footer}}</footer>
 </main>
 </body>
 </html>

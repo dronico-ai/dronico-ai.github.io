@@ -1,0 +1,1382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Talking Light</title>
+<meta name="description" content="How this little engine turns a script into a talking presentation, told by the engine itself.">
+<meta property="og:title" content="Talking Light">
+<meta property="og:description" content="How this little engine turns a script into a talking presentation, told by the engine itself.">
+<meta property="og:image" content="https://dronico-ai.github.io/talking-light/img/portrait.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;500&display=swap">
+<style>
+/* Motor player styles. Single dark theme by choice: a screening room for points of light.
+   Palette from the renders' lighting: warm key (amber, ember), cool rim (moon). */
+:root {
+  color-scheme: dark;
+  --ink: #0a0c12;
+  --ink-2: #121724;
+  --line: #273047;
+  --paper: #ede6dc;
+  --paper-2: #c9c0b5;
+  --moon: #a9b8d8;
+  --clay: #948274;
+  --ember: #ff8a4c;
+  --amber: #ffc98f;
+  --on-amber: #24160a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", Verdana, "Segoe UI", system-ui, sans-serif;
+  --mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+[hidden] { display: none !important; }
+html, body { background: var(--ink); }
+body {
+  margin: 0; color: var(--paper); font-family: var(--body); font-size: 16px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; }
+
+/* ---------- stage ---------- */
+.stage {
+  position: relative; height: 92vh; height: min(92svh, 920px); min-height: 560px;
+  overflow: hidden; isolation: isolate;
+  background: radial-gradient(110% 75% at 50% 30%, #182036 0%, #0f1320 48%, var(--ink) 100%);
+}
+#field { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+.render-view {
+  position: absolute; z-index: 1; left: 0; top: 0; width: 10px; height: 10px; max-width: none;
+  opacity: 0; transition: opacity 1.2s ease; pointer-events: none;
+  -webkit-mask-image: radial-gradient(circle at 50% 48%, #000 52%, transparent 71%);
+  mask-image: radial-gradient(circle at 50% 48%, #000 52%, transparent 71%);
+}
+.render-view.on { opacity: .92; }
+.progress { position: absolute; z-index: 3; left: 0; right: 0; top: 0; height: 2px; background: rgba(169, 184, 216, .16); }
+.progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ember), var(--amber)); }
+.chapter-card {
+  position: absolute; z-index: 3; top: 16px; left: max(16px, 4vw); right: max(16px, 4vw);
+  display: grid; gap: 2px; pointer-events: none; transition: opacity .5s ease;
+}
+.chapter-name { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.2; color: var(--paper); transition: color 1.2s ease; }
+.chapter-card.fresh .chapter-name { color: var(--amber); }
+
+.panel {
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0;
+  padding-inline: max(16px, 5vw); padding-block: 88px 32px;
+  background: linear-gradient(180deg, rgba(10, 12, 18, 0) 0%, rgba(10, 12, 18, .8) 34%, rgba(10, 12, 18, .95) 100%);
+}
+.panel-inner { max-width: 36rem; display: grid; gap: 14px; }
+.eyebrow { margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.5; letter-spacing: .09em; text-transform: uppercase; color: var(--moon); }
+.panel h1, .panel h2 {
+  margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(44px, 10vw, 84px);
+  line-height: .92; letter-spacing: -.025em; text-wrap: balance; color: var(--paper);
+}
+.lede { margin: 0; max-width: 42ch; font-size: 17px; color: var(--paper-2); }
+.pickers { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+.picker { border: 0; margin: 0; padding: 0; min-width: 0; }
+.picker legend { padding: 0; margin-bottom: 8px; font-size: 15px; color: var(--paper-2); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; cursor: pointer; }
+.chip input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.chip span {
+  display: inline-block; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px;
+  font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--paper-2);
+  transition: border-color .15s, color .15s, background-color .15s;
+}
+.chip input:checked + span { border-color: var(--amber); color: var(--amber); background: rgba(255, 201, 143, .08); }
+.chip input:focus-visible + span { outline: 2px solid var(--paper); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 4px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 999px;
+  padding: 13px 22px 13px 18px; background: var(--amber); color: var(--on-amber);
+  font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1.2; cursor: pointer;
+  transition: background-color .15s, transform .15s;
+}
+.btn:hover { background: #ffd8ad; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+.btn[disabled] { opacity: .7; cursor: progress; }
+.btn-ghost { background: transparent; color: var(--paper); border: 1px solid var(--line); padding: 12px 18px; }
+.btn-ghost:hover { background: rgba(237, 230, 220, .06); }
+.tri { width: 0; height: 0; border-left: 11px solid currentColor; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.quiet-link { color: var(--moon); font-size: 15px; text-decoration: underline; text-decoration-color: rgba(169, 184, 216, .4); text-underline-offset: 4px; }
+.quiet-link:hover { color: var(--paper); }
+.quiet-link:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; border-radius: 2px; }
+
+.captions {
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 70px;
+  padding-inline: max(16px, 6vw); display: flex; justify-content: center; pointer-events: none;
+}
+.caption {
+  margin: 0; max-width: 30ch; text-align: center; font-family: var(--body); font-weight: 700;
+  font-size: clamp(20px, 5vw, 31px); line-height: 1.28; text-wrap: balance; color: var(--paper);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 4px 24px rgba(0, 0, 0, .75);
+  transition: opacity .22s ease, transform .22s ease;
+}
+.caption.swap { opacity: 0; transform: translateY(6px); }
+
+.transport {
+  position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px;
+  padding-inline: max(16px, 4vw); padding-block: 10px 14px; font-family: var(--mono); font-size: 12px; color: var(--moon);
+}
+.t-btn {
+  flex: none; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+  background: rgba(18, 23, 36, .75); color: var(--paper); display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.t-btn:hover { border-color: var(--moon); }
+.t-btn:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+.t-btn[disabled] { opacity: .4; cursor: default; }
+.ico { display: block; width: 10px; height: 12px; border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
+.t-btn.paused .ico {
+  width: 0; height: 0; border-right: 0; border-left: 11px solid currentColor;
+  border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 3px;
+}
+.ico-next {
+  position: relative; display: block; width: 0; height: 0; margin-right: 3px;
+  border-left: 9px solid currentColor; border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+}
+.ico-next::after { content: ""; position: absolute; left: 0; top: -6px; width: 2.5px; height: 12px; background: currentColor; }
+.tc { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.t-note { font-family: var(--body); font-size: 13px; color: var(--paper-2); }
+.chord-wrap { margin-left: auto; white-space: nowrap; }
+.chord-label { color: var(--clay); }
+.chord { color: var(--amber); font-variant-numeric: tabular-nums; }
+
+/* ---------- liner notes ---------- */
+.notes {
+  max-width: 1080px; margin-inline: auto; padding-inline: max(16px, 5vw); padding-block: 64px 80px;
+  display: grid; gap: 56px;
+}
+.notes-head { display: grid; gap: 12px; max-width: 62ch; }
+.notes h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(30px, 5.5vw, 48px); line-height: 1; letter-spacing: -.02em; text-wrap: balance; }
+.notes-head p:not(.eyebrow) { margin: 0; color: var(--paper-2); }
+.credits { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
+@media (min-width: 880px) { .credits { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 40px; } }
+.credit { display: grid; gap: 10px; align-content: start; padding-top: 16px; border-top: 1px solid var(--line); }
+.label { margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--ember); }
+.credit h3, .plate h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 23px; line-height: 1.15; letter-spacing: -.01em; text-wrap: balance; }
+.credit p, .plate p { margin: 0; color: var(--paper-2); }
+.specs { margin: 6px 0 0; display: grid; gap: 7px; }
+.specs div { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.specs dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+.specs dd { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--moon); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.plates { display: grid; gap: 48px; }
+.plate { margin: 0; display: grid; gap: 24px; align-items: center; }
+@media (min-width: 760px) {
+  .plate { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; }
+  .plate:nth-child(even) img { order: 2; }
+}
+.plate img { width: 100%; height: auto; display: block; border-radius: 3px; background: #0b0908; }
+.plate figcaption { display: grid; gap: 10px; }
+.transcript { display: grid; gap: 10px; max-width: 72ch; }
+.transcript > p { margin: 0 0 6px; color: var(--paper-2); }
+.tr-chapter { display: grid; gap: 2px; }
+.tr-chapter h3 { margin: 22px 0 6px; display: flex; gap: 12px; align-items: baseline; font-family: var(--display); font-weight: 700; font-size: 19px; }
+.tr-chapter h3 span { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: .08em; color: var(--clay); }
+.tr-chapter ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.line-btn {
+  display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 14px; align-items: baseline;
+  width: calc(100% + 16px); margin-inline: -8px; padding: 6px 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--paper-2); font: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s, color .3s;
+}
+.line-btn:hover { background: rgba(169, 184, 216, .07); color: var(--paper); }
+.line-btn:focus-visible { outline: 2px solid var(--paper); outline-offset: 1px; }
+.line-btn time { font-family: var(--mono); font-size: 12px; color: var(--clay); font-variant-numeric: tabular-nums; }
+.line-btn.now { color: var(--amber); }
+.colophon { border-top: 1px solid var(--line); padding-top: 18px; max-width: 80ch; font-family: var(--mono); font-size: 11.5px; line-height: 1.75; color: var(--clay); display: grid; gap: 8px; }
+.colophon p { margin: 0; }
+.colophon a { color: var(--moon); }
+
+@media (prefers-reduced-motion: reduce) {
+  .caption, .render-view, .btn, .chip span, .chapter-name, .line-btn { transition: none; }
+}
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="field" aria-hidden="true"></canvas>
+  <img id="render-view" class="render-view" alt="" aria-hidden="true">
+  <div class="progress" id="progress" hidden><span id="progress-bar"></span></div>
+  <div class="chapter-card" id="chapter-card" hidden>
+    <p class="eyebrow" id="chapter-num"></p>
+    <p class="chapter-name" id="chapter-name"></p>
+  </div>
+
+  <section class="panel" id="intro" aria-labelledby="intro-title">
+    <div class="panel-inner">
+      <p class="eyebrow" id="intro-eyebrow"></p>
+      <h1 id="intro-title">Talking Light</h1>
+      <p class="lede" id="intro-lede"></p>
+      <div class="pickers">
+        <fieldset class="picker" id="lang-picker" hidden><legend id="lang-legend"></legend><div class="chips" id="lang-chips"></div></fieldset>
+        <fieldset class="picker" id="voice-picker"><legend id="voice-legend"></legend><div class="chips" id="voice-chips"></div></fieldset>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="play"><span class="tri" aria-hidden="true"></span><span id="play-label"></span></button>
+        <a class="quiet-link" href="#transcript" id="transcript-link"></a>
+      </div>
+    </div>
+  </section>
+
+  <div class="captions" id="captions" hidden><p class="caption" id="caption" aria-live="polite"></p></div>
+
+  <section class="panel" id="outro" hidden aria-labelledby="outro-title">
+    <div class="panel-inner">
+      <p class="eyebrow" id="outro-eyebrow"></p>
+      <h2 id="outro-title"></h2>
+      <p class="lede" id="outro-text"></p>
+      <div class="actions">
+        <button type="button" class="btn" id="replay"><span class="tri" aria-hidden="true"></span><span id="replay-label"></span></button>
+        <button type="button" class="btn btn-ghost" id="swap-voice"></button>
+        <button type="button" class="btn btn-ghost" id="swap-lang"></button>
+        <a class="quiet-link" href="#notes" id="notes-link"></a>
+      </div>
+    </div>
+  </section>
+
+  <div class="transport" id="transport" hidden>
+    <button type="button" class="t-btn" id="pause"><span class="ico" aria-hidden="true"></span></button>
+    <button type="button" class="t-btn" id="next"><span class="ico-next" aria-hidden="true"></span></button>
+    <span class="tc" id="tc">0:00 / 0:00</span>
+    <span class="t-note" id="t-note" hidden></span>
+    <span class="chord-wrap"><span class="chord-label" id="chord-label"></span> <span class="chord" id="chord"></span></span>
+  </div>
+</div>
+
+<main class="notes" id="notes"></main>
+
+<script>window.SHOW = {"slug":"talking-light","languages":["en","es"],"langs":{"en":{"texts":{"title":"Talking Light","eyebrow":"A short demo · sound on","lede":"How this little engine turns a script into a talking presentation, told by the engine itself.","idle":"hello","voice_prompt":"Voice","play":"Play the demo","outro_title":"Your turn.","outro_text":"Ask Claude in the chat for a presentation about anything you like.","colophon":"Written by Claude. Voice: Kokoro-82M. Built with the engine in the motor folder of this site.","images":{"portrait":{"title":"A self-portrait, sort of","caption":"Two thousand clay spheres, placed by a Python script in Blender and rendered with Cycles on two CPU cores.","alt":"A sphere made of two thousand small clay-coloured balls, some glowing amber, floating over a dark floor."}}},"order":["af_heart","am_michael"],"voices":{"af_heart":{"label":"Heart","timeline":{"duration":34.62,"envFps":30,"env":"00000000000015ozuxzzzxsie8100000007mzmhckkfloihig9xxpruxwgborppjddhgfeg83cj5968uo916kli956mnbbmje94ijidddb85665a961000000000000000zw6oh6uzzt9h8nzzvhgd3hnf91247100000000002aeozxug12cusrrrngc932cntsqqonlmmmqric9gqqoc1786wvtn75cngeln5cd5ghdb887993100000000000000mnjkg52poo5bmaozqpqfnmic88mnlpn8fi4ashflmhgca99999bdd610010000000nzzzzxxyzzuhgnj1dree486qoe455mnmkgda18acehuyzxo8elliih61emllnmhccba85520000000000000000000000000000000000000000000000pzzfbtxd1abgxvun3k7gopoisg3pkgoutpf69mf1gdd8n855cfd98ac4000000000000szwjhxxtuusqppn992108nnllghkihjohda51042000000000000004vd1axzyyvkdvzxikhgtrrprd166dd14decada7961011000000nzye422uvhonllzwq83046spg2bdpd6gomlmofmnpne8hlrswwige96631000000000000000000000000000000000000kypbevyyk27hetti8gtup8knkibedd6gmljihfljd28nkkkgbb78bdb6000000001qu43qzvzzvfrutrmprpso8imhfa655bcb710000000000000000000000000000000000000000000000bhyzzznmrijje36sxtkc102861000ovmdutjbhvsqlff71442prpwvc558niefgffehmf111111009yzzzb58arqpsskde50ktqoqedjl65heggca74333100000000000000grzkajstphlxsuvupll25ljlg3mkhcab519d610000000000000","lines":[{"start":0.4,"end":3.84,"caption":"Hello. This is a small engine for talking presentations.","chapter":"The script","music":"warm","cue":{"type":"text","value":"hello"},"caps":[{"t":0.4,"text":"Hello."},{"t":1.15,"text":"This is a small engine for talking presentations."}]},{"start":4.29,"end":8.16,"caption":"It starts from a script: chapters, lines, and a cue for each line.","cue":{"type":"text","value":"script"}},{"start":8.61,"end":13.18,"caption":"A speech model reads the lines, and the music is composed live in your browser.","cue":{"type":"wave"}},{"start":14.68,"end":18.31,"caption":"Every cue tells the light what to become: a word, or a shape.","chapter":"The light","music":"inward","cue":{"type":"layers"},"subcues":[{"t":16.92,"cue":{"type":"text","value":"word"}},{"t":17.696,"cue":{"type":"sphere"}}]},{"start":18.76,"end":22.39,"caption":"It can even show a picture, like this self-portrait made in Blender.","cue":{"type":"image","src":"portrait"}},{"start":23.59,"end":26.94,"caption":"It works in English and in Spanish, with more than one voice.","cue":{"type":"many"}},{"start":28.44,"end":32.42,"caption":"Write a script, or just ask Claude for one, and the page builds itself.","chapter":"Your turn","music":"resolve","cue":{"type":"heart"}},{"start":32.87,"end":34.17,"caption":"What will yours be about?","cue":{"type":"text","value":"your turn"}}]},"segs":[{"t":0.0,"url":"audio/en-af_heart-0.mp3"},{"t":13.93,"url":"audio/en-af_heart-1.mp3"},{"t":27.69,"url":"audio/en-af_heart-2.mp3"}]},"am_michael":{"label":"Michael","timeline":{"duration":37.89,"envFps":30,"env":"00000000000016mtmmuzzzzzm95410000000005jzpjfbkddkfmjhc7klqtyyvr81dkomlhedihfd76ae71a7duuj34aghg755ejhcchhe57bjjfdefe8742112551000000000000000vp9iqf3zzzyfgf7hjikhnoe13mzztb201031000001110107okzzvs6018pmkhfc9a8beimspprsunmkjhgcadagikja15444hjigfa76de69deb4id6flnkje96433000000000000006tnvqi10ilic4ni2hjmkpnkfkjga89fggef96e62hhdfipnqutlc74321115a71000000111113nqsonllmpttjhhsa15ggej259jh9175aruohgede23adcdszzwo98hgjhgg867kkikllmjd8cc88410000000000000000000000000000000000000000000000sxvbcnj72865iihd59lfljigfa4giefioqqle64aglc1fda9gc368aqwsj843320000000011100susgddpyyzzzvqnkgdaa818fhighghtnjhfsnkb421022000000000000000rk58munmpspbhnkghmhfsqqnoi4199ph218kkgdb742200001111106ozzq6215rrhmjfdkzutm75045hpkc4aeja59gkiihidjkljf9gjoqqonibca8420000000000000000000000000000000000001wua69lzzz94jjdnhh703iomlgbfijgchebefijhichli40hnkorti8642abc500000000002hpb8ckkrtyxug9nhihhgmliihdadpsxrh732238ba5100000000000000000000000000000000000000000000006evzzyunukrpk333kzzzj5110310000flj9ktjm969bglmngmb12943lrwywtnd777chhgefgc8754211111119nrpna1877krrpkhgbbfa98mqoid9bfja38fd8nmf7321000000000000003cszzd5cnnibabovwztomkqh16dfjjg99ppurg74210520000000000000","lines":[{"start":0.4,"end":4.21,"caption":"Hello. This is a small engine for talking presentations.","chapter":"The script","music":"warm","cue":{"type":"text","value":"hello"},"caps":[{"t":0.4,"text":"Hello."},{"t":1.28,"text":"This is a small engine for talking presentations."}]},{"start":4.66,"end":8.94,"caption":"It starts from a script: chapters, lines, and a cue for each line.","cue":{"type":"text","value":"script"}},{"start":9.39,"end":14.49,"caption":"A speech model reads the lines, and the music is composed live in your browser.","cue":{"type":"wave"}},{"start":15.99,"end":20.08,"caption":"Every cue tells the light what to become: a word, or a shape.","chapter":"The light","music":"inward","cue":{"type":"layers"},"subcues":[{"t":18.52,"cue":{"type":"text","value":"word"}},{"t":19.394,"cue":{"type":"sphere"}}]},{"start":20.53,"end":24.49,"caption":"It can even show a picture, like this self-portrait made in Blender.","cue":{"type":"image","src":"portrait"}},{"start":25.69,"end":29.57,"caption":"It works in English and in Spanish, with more than one voice.","cue":{"type":"many"}},{"start":31.07,"end":35.47,"caption":"Write a script, or just ask Claude for one, and the page builds itself.","chapter":"Your turn","music":"resolve","cue":{"type":"heart"}},{"start":35.92,"end":37.44,"caption":"What will yours be about?","cue":{"type":"text","value":"your turn"}}]},"segs":[{"t":0.0,"url":"audio/en-am_michael-0.mp3"},{"t":15.24,"url":"audio/en-am_michael-1.mp3"},{"t":30.32,"url":"audio/en-am_michael-2.mp3"}]}}},"es":{"texts":{"title":"Luz que habla","eyebrow":"Una demo corta · con sonido","lede":"Cómo este pequeño motor convierte un guion en una presentación que habla, contado por el propio motor.","idle":"hola","voice_prompt":"Voz","play":"Ver la demo","outro_title":"Te toca.","outro_text":"Pídele a Claude en el chat una presentación sobre lo que quieras.","colophon":"Escrito por Claude. Voz: Kokoro-82M. Hecho con el motor de la carpeta motor de esta web.","images":{"portrait":{"title":"Un autorretrato, más o menos","caption":"Dos mil esferas de arcilla, colocadas con un script de Python en Blender y renderizadas con Cycles en dos núcleos de CPU.","alt":"Una esfera hecha de dos mil bolitas de color arcilla, algunas con brillo ámbar, flotando sobre un suelo oscuro."}}},"order":["ef_dora","em_alex"],"voices":{"ef_dora":{"label":"Dora","timeline":{"duration":37.04,"envFps":30,"env":"0000000000000qzzrqzzqc3001mxgb26tqqef9ilne23tg23gtollkkkmkml508vyhcgn42bjcb9igf72jd8ac7jnjhgge9913dklno98ecb86541000000000000003rvqizvnnd19gxubcfzf15ookmjkg9cqvolheca811110005qv40flj605hhgmnmocbb7224jzzzcadckniaa77clnlnlnkam74hnc9bagqmkhd2dpblc25foldke422chkf95886773000000000000000mrsrqwwjbsuqhxvcoq9lum654glsspijpaa932dhzzi7bb9edc7a96101111005finzzhkmomcgdi35nrbddje16iigb22mskkljhg9glbjni1001dliff814ffhig7he6dhc4edba6200000000000000000000000000000000000000000000006zzreuomplci81dwicfhbgqnnmnjtse8fffbdfcmrrkkojkholf9ccegga3ch34kggamj5202flh79bd8ecc8300111100004kssuz60ozonuzzlajnrpe57hghhif522elj77a8654200000000000000dpg15hknkjknye11gvsdnnkklcfb24btzzjebillljkljhqtq8537db9981110005phjqqnqed27uzqa1fn9ih61agyp40fjcenh23faihfg7ghiegf9cfb8620000000000000000000000000000000000002cmoeghfyutluvnjmkjh9hnwxsh8bb6amjfied911ulefgklmmig72000ag419zkhhggwyma3cjfggje5eic9433430000000000000000000000000000000000000000000000fef16dkojdztopobahyvtsqljid711jk401iiidqjediniprd14amuzzqlf7kmi8111102ejqzw10dzza53cjiloecdhg25hge9335eke7ggbde9ihhbb97531000000000000008qzw8116jxxj17emwg1crrftvqmnj617dkkjcagjca97400000000000000","lines":[{"start":0.4,"end":3.77,"caption":"Hola. Esto es un pequeño motor de presentaciones que hablan.","chapter":"El guion","music":"warm","cue":{"type":"text","value":"hola"},"caps":[{"t":0.4,"text":"Hola."},{"t":0.737,"text":"Esto es un pequeño motor de presentaciones que hablan."}]},{"start":4.22,"end":8.92,"caption":"Todo empieza con un guion: capítulos, frases y una indicación para cada frase.","cue":{"type":"text","value":"guion"}},{"start":9.37,"end":14.07,"caption":"Un modelo de voz lee las frases, y la música se compone en directo en tu navegador.","cue":{"type":"wave"}},{"start":15.57,"end":20.27,"caption":"Cada indicación le dice a la luz en qué convertirse: una palabra, o una forma.","chapter":"La luz","music":"inward","cue":{"type":"layers"},"subcues":[{"t":18.77,"cue":{"type":"text","value":"palabra"}},{"t":19.64,"cue":{"type":"sphere"}}]},{"start":20.72,"end":24.8,"caption":"Incluso puede mostrar una imagen, como este autorretrato hecho en Blender.","cue":{"type":"image","src":"portrait"}},{"start":26.0,"end":29.02,"caption":"Funciona en inglés y en español, y con más de una voz.","cue":{"type":"many"}},{"start":30.52,"end":34.59,"caption":"Escribe un guion, o pídeselo a Claude, y la página se construye sola.","chapter":"Te toca","music":"resolve","cue":{"type":"heart"}},{"start":35.04,"end":36.59,"caption":"¿De qué tratará la tuya?","cue":{"type":"text","value":"tu turno"}}]},"segs":[{"t":0.0,"url":"audio/es-ef_dora-0.mp3"},{"t":14.82,"url":"audio/es-ef_dora-1.mp3"},{"t":29.77,"url":"audio/es-ef_dora-2.mp3"}]},"em_alex":{"label":"Alex","timeline":{"duration":37.34,"envFps":30,"env":"0000000000000tzzzuzwjb24nig16tuvilerong23rg24fxplmoqqlmpm509wwiehn62cjchclgh62hc7df9lpnlmkffd14cighll85a985443100000000000000czzeszyqm61fzznigvu61dtlopppj9bpwztngb862111115oh20nsh518oonpzudcc7323ckyzwdilfomfgf82ajsqqqnqpdih25nf9dedotqmld2cndfb32cnmchd523bcfb77dc6432000000000000000urropwuegzztmzycsobluub54cksutpkkgbf633gqyragjdba9bgd511111104hooxxhmmvrfnhh45psejije15hmjd22lunnomkmh9ik8nse1003inifge604fgkji9eg79ed49a865210000000000000000000000000000000000000000000005rzw9uwrrmcpj36smdkkhkzwsqroptg9dnhekmeqsqmkllijnulechdghhg35gp615plnfjn8411fom89fjgbc851111111113mwsxw91bwnmmuyzgfgmnj935ggjjkgb3339mkh6576543100000000000000ipe16hqqlqrrzc21gzzeurqpmdkc16duzzhmpnnomnmklotpb746d8863111014imloposjn65qwsg45odejb13cszm22hncbll42ffgkiid8gjhfgf8bb86410000000000000000000000000000000000002ispcjjhzvuovunmpllj8hnsrukgkh7dnljjej812rmfifprsqkg62100ch439ukkjihttkb3elhihhe67gd86233410000000000000000000000000000000000000000000000hod1ahtufrwtstjafvzzzuolga33gj5008pqjiuhkfpoiql814dmvzytkeanod222212jrrzn207zzb63dlimofgigj33djheaa228epk9didghh9jgf9865431000000000000016vzq7117azyzi418hjyr62msoirtqong5109rstmbcfc876300000000000000","lines":[{"start":0.4,"end":3.69,"caption":"Hola. Esto es un pequeño motor de presentaciones que hablan.","chapter":"El guion","music":"warm","cue":{"type":"text","value":"hola"},"caps":[{"t":0.4,"text":"Hola."},{"t":0.729,"text":"Esto es un pequeño motor de presentaciones que hablan."}]},{"start":4.14,"end":8.88,"caption":"Todo empieza con un guion: capítulos, frases y una indicación para cada frase.","cue":{"type":"text","value":"guion"}},{"start":9.33,"end":14.08,"caption":"Un modelo de voz lee las frases, y la música se compone en directo en tu navegador.","cue":{"type":"wave"}},{"start":15.58,"end":20.4,"caption":"Cada indicación le dice a la luz en qué convertirse: una palabra, o una forma.","chapter":"La luz","music":"inward","cue":{"type":"layers"},"subcues":[{"t":18.81,"cue":{"type":"text","value":"palabra"}},{"t":19.734,"cue":{"type":"sphere"}}]},{"start":20.85,"end":24.92,"caption":"Incluso puede mostrar una imagen, como este autorretrato hecho en Blender.","cue":{"type":"image","src":"portrait"}},{"start":26.12,"end":29.17,"caption":"Funciona en inglés y en español, y con más de una voz.","cue":{"type":"many"}},{"start":30.67,"end":34.78,"caption":"Escribe un guion, o pídeselo a Claude, y la página se construye sola.","chapter":"Te toca","music":"resolve","cue":{"type":"heart"}},{"start":35.23,"end":36.89,"caption":"¿De qué tratará la tuya?","cue":{"type":"text","value":"tu turno"}}]},"segs":[{"t":0.0,"url":"audio/es-em_alex-0.mp3"},{"t":14.83,"url":"audio/es-em_alex-1.mp3"},{"t":29.92,"url":"audio/es-em_alex-2.mp3"}]}}}},"images":{"portrait":{"src":"img/portrait.jpg","tiny":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wgARCADIAMgDASIAAhEBAxEB/8QAHAABAAIDAQEBAAAAAAAAAAAAAAEDAgQFBgcI/8QAGAEBAQEBAQAAAAAAAAAAAAAAAAECAwT/2gAMAwEAAhADEAAAAfl4lAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbnc7vPpwN3p6/Ppq6m5bXnOX7bPWfBvT+b6c8BcgAAAAAT7Kdjj22tJy8bzxts3nX6HOsN7e5W0m9hHoZfj1XuvC9eQayABCslisWe38J9gzvk8y7X4ejKp2NY87X29fWefhtaJbNGyYbGtbNbfmPaebjjK3fz2KxYrAUA/Q/54+48unL857TyWOmbS19Z2dKqo2tG3KyNrn5lu3y5mt+ru8XOvKj0eYAAkRMiPb+J7GN/T/K7/F5dqacdTeNxVWXR0Ziijt0HG6fP7i+p+b+p8LHOZu/DBkMWQlkiGSscw9VXzOt5/RRjs1WYX11VHW59cez8tNMvM2GzrOx5Xu8bea4tb51LRSuFTJLDIQyEdrjTL6mvmdvj3p51tVzhZnZVOXT1patbHT3zrZT054M5qtYKlhNdLOolJCZITJF9Jepbxmddmnmyb+tXlrOOU5XOM5ZVgslKlsVWsGgRz3KBlECZgEyYTlAzrVfnRbZZlGdiZzMZymzBYKlo4yXPcSkiZCWUsZTlLizGEWTVM2iL67tZzzWazjOc2YLVlSweek5dEhIlnIXPIzZAkqQZWms32G8ZZFkyWQD/xAApEAACAgICAQIFBQEAAAAAAAACAwEEABESEwUUMBAgISNABhUiMTJg/9oACAEBAAEFAv8ArUVHWMHw3Eg8XVyfHU+LPELxni7AYYEufwanjIDJKGgDytFZ51Jh33YZM4Dhl3aLAseNWcGBLL3YiSmpSCngWoU6xYJ5n/FLC2YCc5WKxFf063HFNd7FVlWb5eI/cKLVElnuUqcU1kz7v0TXOTmBHtsVGKrgl0iFq0Vw2vm0YWjuYtnrF1LaW2PMyq6v5t5vN5vN5+l6YMsWSWy2MjuTdImIbgArO7OIRMnCt4pcmS18o4kAjrsFh8LAdbd5vN5vN/NTTFP9OMKeYB9hQHbsx6IJc5iVVjVazqhzeRSHLqYK0jEx04Uxlmg6pN8Nh7RIEqT6SljZWBM9N0zJkSrNkOi2vrxGlK2Cps1pRKhJmLkOI3R6BaRZb+tf2qHlPU1rwGtMKMjrPRaxdjtg7L2KjhXcJ/wPSWzC05BErILI/qurmvyK5SHteFdtTLi2BaD7d13eS9qiRUqz1CCVQI2grzx7iXlcUktiSAavTxq2JIPKs5F7XjWcXFcZKFXOlPa5tmeRCw8iRr4chCKi/ThYqdRvFE4EqIqzJLCir6e4ztd7QzIl2AamRwIq7wSSirt6/SzIghUphI+NkYd201VO0Yj/ADMTI5YnpTms1ms1mvnpu4Z/ltmXFjY/lPLYtFQg2QgQCFXfIPs4MiWakyWsuFy0tis1ms1ms17CWQ8GOOwcLhmNeuVQMyU6GB+mBymd/VAccsnx/AXayVbrT/QjvPpkRyK6VUyAdQ+xyyZkp+TXuQ9owdyGZXEH5LVRnevJtljDlpfJrNZrNZr8XWazWazXsbzfw3m83m/a1mva1ms1mvjE5Hy6zWazXuazWazXwjI+Gs1ms1ms1+Br4RkfHWazWa/CjI+f/8QAIREAAQMEAgMBAAAAAAAAAAAAAQACEQMQEiAwMSFAQVH/2gAIAQMBAT8B95tOe1i1YBGn+ItI4GM+lFTaVknNxOzBJRRNpsFU8jampOoR62pmHIjZxhu4MqLAWCqGTu0wgQUVFnO+DizKzRJPtQjynX//xAAiEQACAQMEAgMAAAAAAAAAAAAAAQIDESAQEiEwQFEiMUH/2gAIAQIBAT8B86VT0bpG5iqexST6JTvwha2LEZXWU3ZCEsGU3zlUEsl95VFdCyivlm1Yvo9GQXGbVzlC1Uf19Ww2CSXlXF2rH//EADgQAAIBAwIEBAQEBQMFAAAAAAECAwAREhMhBCIxQTJRYXEUMEKBIzNSkUChscHRJENTYGJw4fD/2gAIAQEABj8C/wCrbxpt+o9KKyy8wF8VXrW+ofPmotiwFuuVAJIyta9m7USuLgdwas6lT6j+CEnEqW3/ACx/elQxiSM38FcKryZ3OADjf96wZbvw7cwvkMT3rBTqyC+B6LbyohMpZWsGx+iooQblRzW/+7VJli+Lc1ZQGxte3Y+1FHFmHzgBuTSvKRrNsPJT/mo5ZLx85BU7g0vENCI8XN0T9NSK8hVMsh5qaWaflSTxYt1tWkweNYwZccan0rQxRx/6iM7M1/KjFwucXBDY8RIMcSfOl4Pg0/CitrSr4Wp/hnvw/DR2y+moJFcaj3C00bizKbH5urLyykd/ooonjzvZ+n2NR8TZ9J2POd1Q0WbFWj31h3pSivDdfxDbJdl3NcTAEiJlQaRl/mRRjVpWOwtl+Z6etanEurSLYumNgbdr1zD4fhuIkBeFT2Hel4KGbS4V5jjLIOa1u/nXwnCxhOFF24lgdmt9QoyKLcLwUfI3TLbrag6QiKZBkx7tft8x+Mm/L4fcXG16Y76OeLDsy/5qNVkNsjpOfD7U0SAq6m5RvCb+Q9avc6xPNFMOQcv9aAePMbacZJxc1ozH8vYoejb9L0CqJDpjkR/I1jFl+HzOeoZhWXKzOubK55VT3ou35KLyrl9rj7065NGEjw8sif61fK0cb2Rb9/c1m4G92b0oj7/LTluZPxGFK+YUB+SUeD71MYwmaPvG3RvagsDazNzabcpBt1ojT11DLjFM/M7Hr7imhDKswQxyLKt9IX2CtUKPHIoG6ZnlG+7etqMep/qW/D26Nv3p+IFooh4Yx0Y+1NoZLmtpG6qAfaoeVbsLKzH8Nj9/KhqkkxKDbL6qEshBdRkyheh9ajaXaRwCbb0r2se/y4oW5rILYbX2qeMJ8RxJQSYR+FbVzzpMskeekviU9l/nQ4fiZMwirJNfZ4h5D/NLaNXbmiiWcEGNezX/AGocLGXA2aZJBfUcdd61lmjORxVLWAX2qZ+FYxhNnYm+XtUc27ObPgBy+tYyFYkc3bA3v5bU5X8KG11Lbqq1phclUgjM7O3pWhpIPrmf6vsaXUkLRXuWO9x2+1OD1B39+/y+GXEhyBlj/ag+8PDQ+JUNpWX3puHULDCT8RHNxAxf0F6w4wSStFeZzbmZv0+1OvEzi82xEi80Y/7a+IDMkUY040J7elAKcv8AlLC61GGaOJGbIYjv5t6VIYejHeZd1CmleyvGFsLdGb1qzsRkDkUbazdvSlBUIB4IyLhq0uy/mr9RNDVcZf70hyGmn6DTKVK9rXy+/wB/lquRBVrX8hV4Yhx06ZHntdEp+E4zi34qeMK8UaHlPpRkkSPhWjAygtiWNMYYpVZwvNLuLVGczixHJILKv6r0cZRCjZZ9WDW6WomPC7C6MeVFFaZtogFndDe/f7UmuXWJxeLStZBUkZcRrbZ2BIlYdvSmY6azP9DfSvUEUszl2iDEIAw1A/n7UYZog80pGq/iDbdfttW7ZsTu1rFvllOzi1MBNirJpDrcf5rTijCEzg6svUY9sqWZc9aWTUu242pHebEu3T9K0/ERrIok5cm3HrRtdoscTjfGRuu9Bn0YtRSXSNrdehtXxWKJ4fh1cXWU9L0YJjpTlXaQ52ia++IqQQrDl0Xh7ZYi18rmh8RrSRdLC2d7U8gmHxaL+YW5WT9K+tOkZjEUiasSXNwe4Jon5YYdRWZTUvsE7UJOJkF9wUG46UrOp4ddHka3jptKJxJEln7i/e9LM+w2HJsN/f0oqvIuV9Qc6PThwd9rMbX7jlpuH4qaOBTG2zKGVR6V8OeDmfhx+IRPcFfI0uoBJF48m2Zj/WsiB5Oo+qiLgmI3Uh9gKvlvk22V/wB/mlf2pRCvN/yHtSwymSUiPlToAPOiZZAGBWzKP7UZUGmu4LE3P7UVHOls2uOVm7VouxsV5lvfL0/pWDDlJvm2xBpNcjUQeM7Bl9qY2Y5i6831+1bZ86fc+9ZWb8v9NCFYxcOWztY+3ztNiFPn51m8hG4DHuRQMYVbnEF+iUFCFiHvr/U23SsNgWI/CTvVgdjvt1U1zA2fY9ftSEjmUkE9zSqMjse92/8AVKRbwH6DWkAuwAO38ABJfbofKoOJLFnkc2BHKLVYc5G9oxy/ejGPq+mPt96ba4/SnQjzNNuOua4jageFVoomi3XK29DU5VxxOwoqgsv86uTc/wACoEjWXoL7CkGisVhY6f1etMuokdubEnHL71YsrW7W5R7Ch4m2tXIoX1FXP/iD/8QAKhAAAgICAQMCBgMBAQAAAAAAAREAITFBUWFxgRAwIJGhscHRQOHwYPH/2gAIAQEAAT8h/wCttwXAwfNBFu0MYaTzA0BPdgCjMGsXpqlzCiUIUCAPO4ACLL+1NsMSv4IBJQsmB38AFq/3UpOQJMHdAfLpLKur02giXmGVUkaIGPkP0lwQQsgp7Ir1YeJos6vcoI2NwNEk6gcXm5BNZ2ohA1Kw6TIh2NQg694ZZIQA2YJBnlb4HyGO0EO3wT4EUUvkaGvMquACQXbPmpeDGNUKHeDWT7hTrGusEQhrnWGtr7zkYGQmDpj9iG7teWbL7BqFV4OrDnf9QpI2mmnjVqMxADr7mYVmeXoY+v7lTAK3IAZRiIwIPV2Po3CfV3RVBbMJRnB3nPZg7AjIFhUDn8Q/5lkwCGQ4O7jDqNgFgAcy0C+0gAo+YQDuGAgZKgGoagrAQkiDIw1KM3mduAug+vWC1RONAOg2PjSJEiRIDAgTLH9cxwhANi3v6IQvB7e/2/WOz7okoZ5YJFfHBli+qGBELYMol0w6iOdV+BlDAXmWtXava+XBUIlzO0DqCljJAPJRmUStjZ2K/aCkaVAyLCGHWGTBBjUIDH3IcBIuiFxE4JNPMSJEiRPicYXSbLOvAEVxEyCBCQDefpAgxBOkdlgCn3i6sv8ABZ6agPNtjFJaYhuwdRRWEixcOiF2hzSi5MkgUysx2DegPMBImmHY4EJ6HEDW10dYHhkASaG2MLiRESX4ofDlpnpHgB4RbUARoDUKJZVsIKTpDGB+iIH5XDESZQ9b/XtjxKkLyAY4E0R7bAJR39YakO7AdQer+iISytEkiGZ3WjK7wHjdvpzEHfXcOcy0xGAfikJTLjMz+CSxowgI+veKLL2DQgxS5SDlz3gUQwtEn0Rdd5nGAKAOjXJKod4GN6QIZ6Jku0LnknNVCuHCOCmHAwGgH8xp8r6+2ZSGINLFq76hh7ZStHLnWT3hIzSI5VG8G/XnvDnSEEjIwQsMSgTUFBbkZBwIJuVriFRJFBDTgVzgQHIA9gCVMKkTOKUBcN3EIlPYE9ZRGNBKLoygyn3PA0yXmAXOrqABVHcbRWeIgoSf+1NDdGKDRHn8Pb5QKM1kzRaIH/0LvcKGexJTyySjFk1M7K84WYdQPpJ7w7OFxFYAjphoCLSMOq9FkybbI8SzrjoQFkjWKgdAGpws5ITGiSEZLzxaJEzwHIRjhlAOEDSQUgAdfWCtuSTwD4omS1pilaQWH7jEBIC8Acrj2F6v0r/J8nBgdUr6XIjeA4TYmksMFaVaMByAQYmtSQdQy3V2oByBq3iIZCiGvc3dF941ECyaAoPu8QQwzBCMMhnaoKCOZdLMySE11OoghcwMkprtCWh+QWQKtsWJosCvAz7XFzCMzAUrCClbyFZDsg3CMCfL1rpFFFFFFFFFFMqAxFFBB16Z8x+1lDhKkDLBTGYASNiLLMamhsgFsSgSRMngbMCHmABClYBINjzxOZ4SZJyYCIWoGQawDmTRz8oTBKkZRrqA6xuZ8QiEVQDIoPuIUvADcAhs9BiAQicwBWQP9uNAI2kEKpPNCEMs+wBRRRQhNRIL8E5liADRQVGVrzuOE8AEii6nNR+0oWOF/MMyzI/rT4jGzKG7ANBlOoLkkAuY4gfdxBdLhFMjalyNZz6upmBUp8WQdAvddYUA7CsY2Rw/xDhIhUBDzr9nxGM3sQa8acXxAUUUUXoKmVSOF8YW2rQfPQQv0nzMnpfcyjIkCJQmeJ4FcR6lxCEDFL8YnxLAQhYwfAG85m14p3wHSEBZWICphnGGh7qbQxukee2IMjbCqa4uKKKKKKKL0XqooKLGYe0QAgGYGHZF3KexAxDc4j7oUikwJUSPJ4wIrAF4QckTgQgjCBHd12lhshg5s97WYYMnCJQJ07usuAMXhZyA8w7OJkmKKKL0KL2rgFzGZQgZCfkR1F1gEAQlNT1Y7QCEDQNtRM94QECBC3pujQ8TYfqYGBcGBhpd+p6xRRRfwwKKARRRRe2Bx+o/VEgYIIBAIoooovYFFFF8LqA+gTgEAgEXtgooBAIvhMD1AIPdAAgEUUUUUXoAgwIBF7gCD0XxD0hAIBFFFFP/2gAMAwEAAgADAAAAEAwwwwwwwwwwwwwwwwwwwwwwwwwgwwxzblGDAwwwwwx4QzHBfQQwwjzyMGfcTvQzzz/PL8akQVRPfPPPIAdOLGiWKcPMPxZS/wAA6vtR67J5ZI2m/noMrjD0WllNBAxishPUFbpaW2ESAVo07LSiUr+dyzapZEGCF7x/+F0F/wCjD//EACMRAAMAAgIBBAMBAAAAAAAAAAABESHwIDFBEDBRYUBxweH/2gAIAQMBAT8Q/OZlgJCyivgT5Hc+xGAw/pu6x9YKRkox0OFKQEzsW3d8H6PsUw63f4Jl+ClL6q23B9Rl9iF0SDbuwevymGYbY3u/5gq3d6FmQVMRznox0MYolPO7/RHcbuDCfHCEINcQ4EyL4CTEJcSEIQTadQvJkb+EYRk9HyhCEGuN4QSIQYT2ELiY/X//xAAhEQADAAICAgIDAAAAAAAAAAAAAREh8BAgMUEwQFFx4f/aAAgBAgEBPxD7yFgNjwyfsZ6HifhggkJZyZGLqFW6QnAeBDd32fshDLd1kJIQnLqKiBREPfDW7tFx7VRxJCW7/cmd3fIxtFq6Xm2CHkZIjt3dgymd3JOiEJ0mGmZGwN/kqHN8kJxeWk8MaehJ7Z4TvSlKUTE+kJ1bKUQYXM5Y+xC5/8QAJhABAQADAAICAgIBBQAAAAAAAREAITFBURBhIHEwkYFAYKGx0f/aAAgBAQABPxD/AHaBC0oGqHWnbwrgRZiRmq+aOweY9E0FJN7CQfbbrxggXx7qg03Wl5r7xAdsocVa6ZzuM4rqruWR68XAzsAQ0eO/9CCBRACq+jKklDRlUGyG49Ny2GsWno0UdDSOuFqQucBg0SIFOu8qtGOM2AfQMRXcEb6dVGUXjaL/AFiRgjqhIetEqHozmMKpth3Cg6V/ZgZCKgRSFDANzx94CZo0U2Qv7FgdxLA6ar/Gv5jSkOqjAMLgCQpcsedh7h7wBVA2PfAFoRe79B1ugRKoNOo1KtTEMLvCuxhC0eS47gVmdrwW18tl3vFAgRBuFdIarZox+m/bLgVsbS6XeIxJJhq+e0Q1ujN4kKyUVw03bDzp633zx5Q6ERO/OivWaFTco2Wkiqre3bjVe8gBjHyff8gKAFVgHVwkICgnAnbGO5oXuCi+B4IUCLRzkfeSBe7dIx3g7tKJzJ2WatVQLXWtzt0U0IsraAdMrHQv6xOnRR2iFqyn38PC4uwEBpBCgBTuETxIXtHYZN1XmUQ528GsMF4FCDMaXmjqqoOBTQDzDZRCeFNsYajAkNuq2sj3DAtgTbkgWxVwGDAFjA2X3+X2Z9mfZn2Z9mCeXeNHz5TwXafV4LEBVQ3d8kcIPRHMSaA0CVNCT71GTD3XQuIZSlQC2fdbLYSBpWQAAGr6Ay6wzkOdo2BC+UwkmEAX22vmI1ScxyAlQOSVt9j6rDCXIPJvgEE4377M1D1PsB1CsdS2dct4gC7u4dpCOkyFxtMj9iOiyJF4frNyPKAqhKCgUf1zNK5kgRVWCjIIkDWAtCEN6Fz7M+zPsz7M+z8nYJoplEnk1fVxsBYiAGrdAusR2sgdUtoU61CbIYFpenIro9GlNye8FoaIArMjGkRRh4/Pm941NDoKdmjjGOqGpG0qHgs1lYukZ0IxbqgAEN5KkEFYvCwFXYecEGWIGQBB4lZA7kefR00sAha2gNYptfO4NmooN13rGcIBgQJANJ7XII4HiaaCqBOaIu3CU1CC1tM0sjV+/H8R3FniG0sdz7TkQfWJs1srVLQSIdUgGbtkIkYStoohtUNUGQTgkJO0obAcGGB1qGUDUyIOhXCwuVxg2s/7DVaQvkCLPKNENAl2Jgb0nTpBt61krx3bFsGAlKtUhUBFcRysfRP9CFd9YG4WogY1aUnW1oXDkrEp0KNao7dB94gGcNolFfwWDXZLkW43UwVqIGHisV21FQTU02dwDV7aP45ZA4WOApIC8Q+ZkxaBBk7OrHbR06PikhqEaoQdFh/Y7RApMFbq0JoQoBi0uFhchwm2gQPIGJiyAtFkAAqfrWFcozyB2CDje4eMcL0o+LCkILNwLs7U96RF0B5MmmcxktJtvNgYbMlJzCtH2CMcihv2aMg+BZDqYJSO/foxgDCCBqLqGnkqgZouGUa7otoxqO9qUhHTpRL2F7lOIk/GZMmTJihaj1UQeOUDmt+8SMiInhV1oUaWF4uJ028JnpwQIx1bgCBfIzRGg2vSB3eLV8CBkKWmQ1rTd1I7AAThArsKR0OLQnYpmSbE6w3qsycSQfleb2hd01UwZEt4Q0cqBDaTTzFmwra7KGr6XfMw9WmEXINEBbowRwNiyN0jQuk5N4J7xJRsDxduhshkjYRa8z5wKGjtLpBSbED40YfpcmTJkyZMnwmTJRUFZsff3DIfdihSBgGgU6FrQUHjKgUTNChFoRuBp4XfLaMj9fUMjsyLuHU1HPhXRcKKFOTdLOoSBVrHgHFZABdghEjHLjKHxy9ZrCMugQa4ScTDyUe5phaJRxHtJlC7S4rIOntHNN8IeGICqFCIduR+XRnTVWWDpQ+sJoOGg+g5QZQu5oAe9nCF5DJW4CTF8UjsCotfpr+P4GRgm+zLKozWA4SsfhKu9GTpgWIUBEHzS/rAUFH6UHktHey+sKQwQkNDjS6LUNYjqjNaw4tXotHjIQfSCYVvVRgdJTH9VlOwiKgErTipVEqaCm17vhvLlEbawsaRqrYmslg5NAg16qMdF9uUqSVozadaOLcf6LuTq2tTXdpgvN7kzsmq0Gg27MRui1+L8b9fjMnwPkVzmPrDT7lmB1DCkt3KLK3UxCX6KxooYZA0BQzodj45dya/ZsMVclAGCU2k0AQXUxE5KSzaTwAhO5hYJJ7p8ma0VAzTgYlSMvkFi6kj+8rREmWBvk7Nn9YJoWAbwFEgY0bLrFL5co3UY06bwGO6gSDZDZN637MA8qcoBoOjoqq+P44AMTAoRRNidMWqewJxqzbGwdXHnIaj/wAk5Ylb25YvhcFaZtESqSZXDwdCiw3ZDYf8sARsx3rLRnjEBHZC3GRvg36vcayfX0ftCiAyydsGkdDAxFdV8459L4RI5U37i3DuAWXzDjKFaa3cO6avCbsqit9aJ+b78UwxMnyUSIGieMalnSNJs1pJ3x4yIMHm3U7o7rt2zHKRUrHYakLujeZbhB9ZRGofF1AyEyVSEdXRWxmGcIElAK0DlDsTBa3UhYU3JAUaC4UehSboAMQ0DmI2aA1cu1ULuGsacN6HD4T8NczJkyZMmTAyYecydJ6JovnWTaIiVSBUsEpJdQx+NLzChoigVsGVwTtvu77IfKSPjBhPOlGiAVA0e1ckdnNiWVRJCDPeDnkJDa8p5T1/8wwZMmT8AcTJkyZMmTJkyfEuBhg+AZMmTJ8H6fBxMnzcjJ+FYv4nwWYxwfIGDJ+HOLlxc3k+QGByHE450wRjme3AxT5UyYPgfhMmTJgYYPxLTj9MYxT4nK/AYPkPwnwGBgYHyB8BWEYfDOb/AMBTJg+B+EyYGBgYGDDgfAMT4DJg3h/A0yfG5//Z","ramp":[[9,6,5],[27,22,19],[46,37,34],[64,54,50],[83,69,62],[114,82,62],[133,97,74],[150,113,89],[165,129,105],[178,146,123],[191,162,140],[205,179,159],[220,195,176],[234,212,194],[248,229,211],[255,248,232]],"aspect":1.0,"w":1080,"h":1080}},"single":"talking-light.html"};</script>
+<script>
+/* Motor: a player for talking presentations.
+   Reads window.SHOW, written by motor/build.py. No libraries: canvas particles, Web Audio music,
+   narration decoded one chapter at a time, captions, chapters, transcript, EN/ES interface. */
+(() => {
+  'use strict';
+
+  const SHOW = window.SHOW;
+  const LANG_NAMES = { en: 'English', es: 'Español', fr: 'Français', it: 'Italiano', pt: 'Português' };
+  const UI = {
+    en: {
+      voice: 'Voice', language: 'Language', play: 'Play', ready: 'Getting ready…', readTranscript: 'Read the transcript',
+      playAgain: 'Play again', hearAs: 'Hear it as {name}', notesLink: 'Liner notes', theEnd: 'The end',
+      outroTitle: 'Thanks for watching.', notesEyebrow: 'Liner notes', notesTitle: 'How this was made',
+      transcript: 'Transcript', tapLine: 'Tap any line to play from there.',
+      captionsOnly: 'The voice couldn’t play here, so captions only.', noSound: 'Sound isn’t available here, so captions only.',
+      pause: 'Pause', resume: 'Resume', next: 'Next chapter', chord: 'chord', download: 'Download as a single file',
+      voiceLabel: 'Voice', voiceTitle: 'An open-source voice',
+      voiceText: 'Kokoro, a small text-to-speech model with open weights, read the {n} lines of the script one at a time. They were joined with timed pauses so the captions and the light can follow along.',
+      musicLabel: 'Music', musicTitle: 'Composed live in your browser',
+      musicText: 'No samples or recordings. A small synthesizer built with the Web Audio API plays chord loops, a soft bass and a pentatonic melody that takes a random walk, so no two plays are the same. Each chapter sets a mood, and the music gets quieter whenever the voice speaks.',
+      lightLabel: 'Light', lightTitle: 'Points that find their places',
+      lightText: 'A particle system on a 2D canvas, written from scratch. Words are drawn off-screen and sampled into target positions; shapes like the sphere, the network or the compass are computed every frame. Overlapping points add up their light, and each frame only partly erases the last one, which leaves the trails.',
+      specVoices: 'Voices', specLength: 'Length', specModel: 'Model', specTempo: 'Tempo',
+      specParticles: 'Particles', specCues: 'Cues', specFps: 'Frame rate',
+      onScreen: '{n} on this screen', perPlay: '{n} per play', fpsLive: '{n} fps, measured live',
+      moods: { warm: 'Warm', inward: 'Inward', hush: 'Hush', resolve: 'Resolve' },
+    },
+    es: {
+      voice: 'Voz', language: 'Idioma', play: 'Reproducir', ready: 'Preparando…', readTranscript: 'Leer la transcripción',
+      playAgain: 'Volver a reproducir', hearAs: 'Escúchalo con {name}', notesLink: 'Notas', theEnd: 'Fin',
+      outroTitle: 'Gracias por verlo.', notesEyebrow: 'Notas', notesTitle: 'Cómo se hizo',
+      transcript: 'Transcripción', tapLine: 'Toca cualquier línea para reproducir desde ahí.',
+      captionsOnly: 'La voz no se ha podido reproducir aquí; solo subtítulos.', noSound: 'Aquí no hay sonido; solo subtítulos.',
+      pause: 'Pausa', resume: 'Continuar', next: 'Capítulo siguiente', chord: 'acorde', download: 'Descargar en un solo archivo',
+      voiceLabel: 'Voz', voiceTitle: 'Una voz de código abierto',
+      voiceText: 'Kokoro, un pequeño modelo de texto a voz de pesos abiertos, leyó las {n} frases del guion una a una. Se unieron con pausas medidas para que los subtítulos y la luz puedan seguirlas.',
+      musicLabel: 'Música', musicTitle: 'Compuesta en directo en tu navegador',
+      musicText: 'Sin muestras ni grabaciones. Un pequeño sintetizador hecho con la Web Audio API toca bucles de acordes, un bajo suave y una melodía pentatónica que avanza al azar, así que nunca suena igual. Cada capítulo marca un ambiente, y la música baja cuando habla la voz.',
+      lightLabel: 'Luz', lightTitle: 'Puntos que encuentran su sitio',
+      lightText: 'Un sistema de partículas en un canvas 2D, escrito desde cero. Las palabras se dibujan fuera de la pantalla y se convierten en puntos de destino; formas como la esfera, la red o la brújula se calculan en cada fotograma. Los puntos que se solapan suman su luz, y cada fotograma borra solo en parte el anterior, lo que deja la estela.',
+      specVoices: 'Voces', specLength: 'Duración', specModel: 'Modelo', specTempo: 'Tempo',
+      specParticles: 'Partículas', specCues: 'Indicaciones', specFps: 'Fotogramas',
+      onScreen: '{n} en esta pantalla', perPlay: '{n} por reproducción', fpsLive: '{n} fps, medidos en directo',
+      moods: { warm: 'Cálido', inward: 'Íntimo', hush: 'Susurro', resolve: 'Resolución' },
+    },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), canvas = $('field'), ctx = canvas.getContext('2d');
+  const intro = $('intro'), outro = $('outro'), capBox = $('captions'), capEl = $('caption');
+  const transport = $('transport'), pauseBtn = $('pause'), nextBtn = $('next'), tcEl = $('tc'), chordEl = $('chord'), noteEl = $('t-note');
+  const progress = $('progress'), progBar = $('progress-bar'), renderView = $('render-view');
+  const chapterCard = $('chapter-card'), chapterNum = $('chapter-num'), chapterName = $('chapter-name');
+  const playBtn = $('play'), playLabel = $('play-label'), replayBtn = $('replay'), swapBtn = $('swap-voice'), swapLangBtn = $('swap-lang');
+  const REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const FONT = '"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif';
+  const LEAD = 2.2; // seconds of music before the first word
+
+  const pickLang = () => {
+    const prefs = (navigator.languages || [navigator.language || 'en']).map((l) => String(l).slice(0, 2).toLowerCase());
+    return prefs.find((p) => SHOW.languages.includes(p)) || SHOW.languages[0];
+  };
+  let lang = pickLang();
+  let voice = SHOW.langs[lang].order[0];
+  const L = () => SHOW.langs[lang];
+  const V = () => L().voices[voice];
+  const TX = () => L().texts;
+  const S = () => Object.assign({}, UI.en, UI[lang] || {});
+  const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+
+  let state = 'rest'; // rest | loading | playing | paused | ended
+  let tl = null, narrStart = 0, events = [], evi = 0, capTimer = 0, cardTimer = 0, voiceReady = false;
+  let level = 0, vEnv = 0, energy = 0;
+  let cue = { type: 'drift' }, imgTimer = 0, pAlpha = 1, pAlphaT = 1, shapeT0 = 0;
+  let CHAPTERS = [];
+
+  function b64ToBuf(s) {
+    const bin = atob(s), n = bin.length, u = new Uint8Array(n);
+    for (let i = 0; i < n; i++) u[i] = bin.charCodeAt(i);
+    return u.buffer;
+  }
+
+  /* ================= particles ================= */
+  const MAX_N = 4200;
+  const px = new Float32Array(MAX_N), py = new Float32Array(MAX_N);
+  const vx = new Float32Array(MAX_N), vy = new Float32Array(MAX_N);
+  const tx = new Float32Array(MAX_N), ty = new Float32Array(MAX_N);
+  const kmul = new Float32Array(MAX_N), ph = new Float32Array(MAX_N), rad = new Float32Array(MAX_N);
+  const lx = new Float32Array(MAX_N), ly = new Float32Array(MAX_N), lz = new Float32Array(MAX_N);
+  const spd = new Float32Array(MAX_N), dsc = new Float32Array(MAX_N).fill(1);
+  const has = new Uint8Array(MAX_N), base = new Uint8Array(MAX_N), colr = new Uint8Array(MAX_N), kind = new Uint8Array(MAX_N);
+  const order = new Uint16Array(MAX_N);
+  let N = 0, W = 0, H = 0, DPR = 1, seeded = false, nDyn = 0;
+
+  const PALETTE = [[255, 201, 143], [255, 138, 76], [237, 230, 220], [169, 184, 216]]; // amber, ember, paper, moon
+  const WEIGHTS = [0.44, 0.24, 0.2, 0.12];
+  function sprite(rgb) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    const s = rgb.join(',');
+    gr.addColorStop(0, `rgba(${s},1)`);
+    gr.addColorStop(0.22, `rgba(${s},.85)`);
+    gr.addColorStop(0.5, `rgba(${s},.2)`);
+    gr.addColorStop(1, `rgba(${s},0)`);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 32, 32);
+    return c;
+  }
+  let sprites = PALETTE.map(sprite);
+  const RAMP_BASE = {}, TINY = {};
+  for (const k of Object.keys(SHOW.images || {})) {
+    const img = SHOW.images[k];
+    RAMP_BASE[k] = sprites.length;
+    sprites = sprites.concat(img.ramp.map(sprite));
+    const im = new Image();
+    im.src = img.tiny;
+    TINY[k] = im;
+    new Image().src = img.src; // warm the cache
+  }
+  const SPRITES = sprites;
+
+  function pickColor() {
+    let r = Math.random();
+    for (let i = 0; i < WEIGHTS.length; i++) { r -= WEIGHTS[i]; if (r <= 0) return i; }
+    return 0;
+  }
+  function seedAll() {
+    const small = W < 600;
+    for (let i = 0; i < MAX_N; i++) {
+      px[i] = Math.random() * W; py[i] = Math.random() * H; vx[i] = vy[i] = 0; has[i] = 0;
+      base[i] = colr[i] = pickColor();
+      kmul[i] = 0.65 + Math.random() * 0.7;
+      ph[i] = Math.random();
+      rad[i] = (small ? 3.1 : 3.7) * (0.7 + Math.random() * 0.6);
+    }
+    seeded = true;
+  }
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
+    if (nw === W && nh === H) return;
+    const ow = W, oh = H;
+    W = nw; H = nh;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (!seeded) seedAll();
+    else if (ow && oh) for (let i = 0; i < MAX_N; i++) { px[i] *= W / ow; py[i] *= H / oh; }
+    N = Math.round(Math.min(MAX_N, Math.max(2000, (W * H) / 170)));
+    applyCue(cue, 0);
+    const n = $('spec-n');
+    if (n) n.textContent = fill(S().onScreen, { n: N.toLocaleString(lang) });
+  }
+
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d', { willReadFrequently: true });
+  function offscreen(w, h) {
+    if (off.width !== w || off.height !== h) { off.width = w; off.height = h; } else octx.clearRect(0, 0, w, h);
+    return octx;
+  }
+  // Where shapes form: above whichever panel is showing, else between the chapter card and the captions.
+  function box() {
+    const panel = state === 'ended' ? outro : (state === 'rest' || state === 'loading') ? intro : null;
+    const top = panel ? 14 : 70;
+    let yMax = H * 0.7;
+    if (panel && !panel.hidden) yMax = Math.min(H - 40, panel.offsetTop + 70);
+    const h = Math.max(120, yMax - top);
+    return { x: 16, y: top, w: Math.max(40, W - 32), h, cx: W / 2, cy: top + h / 2 };
+  }
+
+  function textPoints(str) {
+    const b = box();
+    const w = Math.floor(b.w), h = Math.floor(b.h);
+    const o = offscreen(w, h);
+    o.textAlign = 'left';
+    o.textBaseline = 'alphabetic';
+    o.font = `800 100px ${FONT}`;
+    const m = o.measureText(str);
+    const asc = m.actualBoundingBoxAscent || 74, desc = m.actualBoundingBoxDescent || 20;
+    const tw = Math.max(1, (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width));
+    const fs = Math.min((100 * w * 0.9) / tw, (100 * h * 0.78) / (asc + desc), W < 600 ? 190 : 280);
+    const k = fs / 100;
+    o.font = `800 ${fs.toFixed(1)}px ${FONT}`;
+    o.textAlign = 'center';
+    o.fillStyle = '#fff';
+    o.fillText(str, w / 2, h / 2 + ((asc - desc) * k) / 2);
+    const d = o.getImageData(0, 0, w, h).data;
+    let area = 0;
+    for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) if (d[(y * w + x) * 4 + 3] > 127) area += 4;
+    const step = Math.max(1.4, Math.min(11, Math.sqrt(area / (N * 0.9))));
+    const pts = [];
+    for (let y = step / 2; y < h; y += step) {
+      for (let x = step / 2; x < w; x += step) {
+        const jx = x + (Math.random() - 0.5) * step * 0.7, jy = y + (Math.random() - 0.5) * step * 0.7;
+        const ix = jx | 0, iy = jy | 0;
+        if (ix >= 0 && iy >= 0 && ix < w && iy < h && d[(iy * w + ix) * 4 + 3] > 127) pts.push(b.x + jx, b.y + jy);
+      }
+    }
+    return pts;
+  }
+
+  function imageRect(key) {
+    const b = box(), ar = (SHOW.images[key] && SHOW.images[key].aspect) || 1;
+    let w = Math.min(b.w, b.h * 1.04 * ar), h = w / ar;
+    if (h > b.h * 1.04) { h = b.h * 1.04; w = h * ar; }
+    return { x: b.cx - w / 2, y: b.cy - h / 2, w: Math.floor(w), h: Math.floor(h) };
+  }
+  function imagePoints(key) {
+    const img = SHOW.images[key];
+    if (!img) return null;
+    const r = imageRect(key);
+    if (renderView.getAttribute('src') !== img.src) renderView.setAttribute('src', img.src);
+    Object.assign(renderView.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
+    const im = TINY[key];
+    if (!im || !im.complete || !im.naturalWidth) return null;
+    const Tw = 200, Th = Math.max(20, Math.round(200 / (img.aspect || 1)));
+    const o = offscreen(Tw, Th);
+    o.drawImage(im, 0, 0, Tw, Th);
+    const d = o.getImageData(0, 0, Tw, Th).data;
+    const pts = [], cols = [], Lr = img.ramp.length, rb = RAMP_BASE[key];
+    for (let y = 0; y < Th; y++) {
+      for (let x = 0; x < Tw; x++) {
+        const k = (y * Tw + x) * 4;
+        const lum = (0.2126 * d[k] + 0.7152 * d[k + 1] + 0.0722 * d[k + 2]) / 255;
+        if (lum < 0.1) continue;
+        pts.push(r.x + ((x + Math.random()) / Tw) * r.w, r.y + ((y + Math.random()) / Th) * r.h);
+        cols.push(rb + Math.min(Lr - 1, Math.floor(lum * Lr)));
+      }
+    }
+    return { pts, cols };
+  }
+
+  function shuffleOrder() {
+    for (let i = 0; i < N; i++) order[i] = i;
+    for (let i = N - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = order[i]; order[i] = order[j]; order[j] = t; }
+  }
+  function assign(pts, cols) {
+    const count = pts.length / 2;
+    const idx = new Uint32Array(count);
+    for (let i = 0; i < count; i++) idx[i] = i;
+    for (let i = count - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+    const n = Math.min(count, Math.floor(N * 0.94));
+    shuffleOrder();
+    for (let j = 0; j < N; j++) {
+      const i = order[j];
+      dsc[i] = 1;
+      if (j < n) { const p = idx[j]; tx[i] = pts[p * 2]; ty[i] = pts[p * 2 + 1]; has[i] = 1; colr[i] = cols ? cols[p] : base[i]; }
+      else { has[i] = 0; colr[i] = base[i]; }
+    }
+    for (let i = N; i < MAX_N; i++) has[i] = 0;
+  }
+  function release() { for (let i = 0; i < MAX_N; i++) { has[i] = 0; colr[i] = base[i]; dsc[i] = 1; } }
+
+  /* ----- computed shapes: local coordinates are set once per cue, targets every frame ----- */
+  const FRAC = { wave: 0.88, ring: 0.9, sphere: 0.9, layers: 0.9, many: 0.9, compass: 0.92, heart: 0.9 };
+  let NODES = [], EDGES = [], ringsK = 12, gridCols = 3;
+  function setupDynamic(c) {
+    shuffleOrder();
+    const n = (nDyn = Math.floor(N * FRAC[c.type]));
+    for (let j = 0; j < N; j++) { const i = order[j]; has[i] = j < n ? 1 : 0; colr[i] = base[i]; dsc[i] = 1; kind[i] = 0; }
+    const R = Math.random;
+    if (c.type === 'sphere') {
+      const golden = Math.PI * (3 - Math.sqrt(5));
+      for (let j = 0; j < n; j++) {
+        const i = order[j], y = 1 - (2 * (j + 0.5)) / n, r = Math.sqrt(1 - y * y), th = golden * j;
+        lx[i] = Math.cos(th) * r; ly[i] = y; lz[i] = Math.sin(th) * r;
+      }
+    } else if (c.type === 'layers') {
+      const counts = W < 600 ? [3, 5, 5, 2] : [4, 6, 6, 6, 3];
+      NODES = []; EDGES = [];
+      const colStart = [];
+      counts.forEach((cnt, ci) => {
+        colStart.push(NODES.length);
+        for (let k = 0; k < cnt; k++) NODES.push({ x: -1 + (2 * ci) / (counts.length - 1), y: cnt === 1 ? 0 : -1 + (2 * k) / (cnt - 1) });
+      });
+      for (let ci = 0; ci < counts.length - 1; ci++) {
+        for (let a = 0; a < counts[ci]; a++) for (let bb = 0; bb < counts[ci + 1]; bb++) EDGES.push([colStart[ci] + a, colStart[ci + 1] + bb]);
+      }
+      const nNodes = Math.floor(n * 0.42);
+      for (let j = 0; j < n; j++) {
+        const i = order[j];
+        if (j < nNodes) { kind[i] = 0; lx[i] = j % NODES.length; ly[i] = R() * Math.PI * 2; lz[i] = Math.sqrt(R()); colr[i] = R() < 0.6 ? 0 : 2; }
+        else { kind[i] = 1; lx[i] = j % EDGES.length; ly[i] = R(); spd[i] = 0.18 + R() * 0.22; colr[i] = 3; dsc[i] = 0.62; }
+      }
+    } else if (c.type === 'many') {
+      gridCols = W < 600 ? 3 : 6;
+      ringsK = gridCols * (W < 600 ? 4 : 3);
+      const per = n / ringsK;
+      for (let j = 0; j < n; j++) { const i = order[j]; lx[i] = j % ringsK; ly[i] = (Math.floor(j / ringsK) / per) * Math.PI * 2; }
+    } else if (c.type === 'compass') {
+      const nRing = Math.floor(n * 0.42), nTick = Math.floor(n * 0.12), nNeedle = Math.floor(n * 0.42);
+      for (let j = 0; j < n; j++) {
+        const i = order[j];
+        if (j < nRing) { kind[i] = 0; lx[i] = (j / nRing) * Math.PI * 2; ly[i] = 1 + (R() - 0.5) * 0.05; }
+        else if (j < nRing + nTick) {
+          const tk = j % 32, card = tk % 8 === 0;
+          kind[i] = 1; lx[i] = (tk / 32) * Math.PI * 2; ly[i] = card ? 0.68 + R() * 0.22 : 0.8 + R() * 0.1;
+          colr[i] = tk === 0 ? 1 : 2;
+        } else if (j < nRing + nTick + nNeedle) {
+          const u = R() * 2 - 1, v = (R() * 2 - 1) * (1 - Math.abs(u));
+          kind[i] = 2; lx[i] = u; ly[i] = v; colr[i] = u > 0 ? 1 : 3;
+        } else { kind[i] = 3; lx[i] = R() * Math.PI * 2; ly[i] = Math.sqrt(R()); colr[i] = 2; }
+      }
+    } else if (c.type === 'heart') {
+      let j = 0;
+      while (j < n) {
+        const x = (R() * 2 - 1) * 1.15, y = R() * 2.3 - 1.05;
+        const q = x * x + y * y - 1;
+        if (q * q * q - x * x * y * y * y <= 0) { const i = order[j]; lx[i] = x; ly[i] = y; colr[i] = R() < 0.6 ? 1 : 0; j++; }
+      }
+    }
+  }
+
+  function dynTargets(t) {
+    const b = box(), n = nDyn, tau = t - shapeT0;
+    if (cue.type === 'wave') {
+      const rows = 5, gap = Math.min(22, b.h / 9), per = n / rows;
+      const amp = Math.min(b.h * 0.22, 90) * (0.45 + level * 1.6);
+      for (let j = 0; j < n; j++) {
+        const i = order[j], row = j % rows, u = (Math.floor(j / rows) + 0.5) / per;
+        tx[i] = b.x + 8 + u * (b.w - 16);
+        ty[i] = b.cy + (row - (rows - 1) / 2) * gap + amp * Math.sin(u * Math.PI * 3.2 + t * 1.7 + row * 0.55) * (0.6 + 0.4 * Math.sin(t * 0.6 + row));
+      }
+    } else if (cue.type === 'ring') {
+      const R = Math.min(b.w, b.h) * 0.42, radii = [0.5, 0.74, 1.0], per = n / 3;
+      for (let j = 0; j < n; j++) {
+        const i = order[j], ring = j % 3;
+        const a = (Math.floor(j / 3) / per) * Math.PI * 2 + t * 0.18 * (ring === 1 ? -1 : 1);
+        const r = R * radii[ring] * (1 + (vEnv * 0.22 * (ring + 1)) / 1.5 + 0.035 * Math.sin(a * 7 + t * 2.3 + ring));
+        tx[i] = b.cx + r * Math.cos(a);
+        ty[i] = b.cy + r * Math.sin(a);
+      }
+    } else if (cue.type === 'sphere') {
+      const R = Math.min(b.w, b.h) * 0.42 * (1 + vEnv * 0.06);
+      const a = tau * 0.35 + 0.6, ca = Math.cos(a), sa = Math.sin(a), tilt = 0.38, ct = Math.cos(tilt), st = Math.sin(tilt);
+      for (let j = 0; j < n; j++) {
+        const i = order[j];
+        const x1 = lx[i] * ca + lz[i] * sa, z1 = -lx[i] * sa + lz[i] * ca;
+        const y2 = ly[i] * ct - z1 * st, z2 = ly[i] * st + z1 * ct;
+        const p = 2.8 / (2.8 + z2);
+        tx[i] = b.cx + x1 * R * p;
+        ty[i] = b.cy - y2 * R * p;
+        dsc[i] = 0.45 + 0.55 * (1 - (z2 + 1) / 2);
+      }
+    } else if (cue.type === 'layers') {
+      const sx = b.w * 0.4, sy = Math.min(b.h * 0.38, b.w * 0.55), nr = Math.min(b.w, b.h) * 0.032 * (1 + vEnv * 0.6);
+      for (let j = 0; j < n; j++) {
+        const i = order[j];
+        if (kind[i] === 0) {
+          const nd = NODES[lx[i] | 0];
+          tx[i] = b.cx + nd.x * sx + Math.cos(ly[i]) * lz[i] * nr;
+          ty[i] = b.cy + nd.y * sy + Math.sin(ly[i]) * lz[i] * nr;
+        } else {
+          const e = EDGES[lx[i] | 0], A = NODES[e[0]], B = NODES[e[1]];
+          const u = (ly[i] + tau * spd[i]) % 1;
+          tx[i] = b.cx + (A.x + (B.x - A.x) * u) * sx;
+          ty[i] = b.cy + (A.y + (B.y - A.y) * u) * sy;
+        }
+      }
+    } else if (cue.type === 'many') {
+      const rows = Math.ceil(ringsK / gridCols), cw = b.w / gridCols, chh = b.h / rows;
+      const R = Math.min(cw, chh) * 0.3;
+      for (let j = 0; j < n; j++) {
+        const i = order[j], k = lx[i] | 0, col = k % gridCols, row = (k / gridCols) | 0;
+        const cx = b.x + (col + 0.5) * cw, cy = b.y + (row + 0.5) * chh;
+        const a = ly[i] + t * 0.5 * (k % 2 ? 1 : -1);
+        const r = R * (1 + 0.14 * Math.sin(t * 2.1 + k * 1.37) + vEnv * 0.12);
+        tx[i] = cx + r * Math.cos(a);
+        ty[i] = cy + r * Math.sin(a);
+      }
+    } else if (cue.type === 'compass') {
+      const R = Math.min(b.w, b.h) * 0.42, Ln = R * 0.74, Wd = R * 0.1;
+      const th = (cue.off || 0) + 1.15 * Math.exp(-1.0 * tau) * Math.cos(3.1 * tau) + vEnv * 0.03 * Math.sin(t * 9);
+      const dx = Math.sin(th), dy = -Math.cos(th); // needle direction, 0 = north (up)
+      for (let j = 0; j < n; j++) {
+        const i = order[j];
+        if (kind[i] === 0) { tx[i] = b.cx + Math.cos(lx[i]) * R * ly[i]; ty[i] = b.cy + Math.sin(lx[i]) * R * ly[i]; }
+        else if (kind[i] === 1) { const a = lx[i] - Math.PI / 2; tx[i] = b.cx + Math.cos(a) * R * ly[i]; ty[i] = b.cy + Math.sin(a) * R * ly[i]; }
+        else if (kind[i] === 2) { const u = lx[i] * Ln, v = ly[i] * Wd; tx[i] = b.cx + dx * u - dy * v; ty[i] = b.cy + dy * u + dx * v; }
+        else { tx[i] = b.cx + Math.cos(lx[i]) * ly[i] * R * 0.06; ty[i] = b.cy + Math.sin(lx[i]) * ly[i] * R * 0.06; }
+      }
+    } else if (cue.type === 'heart') {
+      const Sz = Math.min(b.w, b.h) * 0.36;
+      const phase = (tau * 1.2) % 1; // 72 BPM
+      const pulse = Math.exp(-phase * 9) + (phase > 0.28 ? 0.55 * Math.exp(-(phase - 0.28) * 12) : 0);
+      const sc = Sz * (1 + 0.06 * pulse + vEnv * 0.03);
+      for (let j = 0; j < n; j++) { const i = order[j]; tx[i] = b.cx + lx[i] * sc; ty[i] = b.cy - (ly[i] - 0.12) * sc; }
+    }
+  }
+
+  function applyCue(c, sound) {
+    cue = c;
+    shapeT0 = performance.now() / 1000;
+    clearTimeout(imgTimer);
+    if (c.type !== 'image') { renderView.classList.remove('on'); pAlphaT = 1; }
+    if (c.type === 'text') assign(textPoints(c.value));
+    else if (c.type === 'image') {
+      const r = imagePoints(c.src);
+      if (r) assign(r.pts, r.cols); else release();
+      imgTimer = setTimeout(() => { if (cue.type === 'image') { renderView.classList.add('on'); pAlphaT = 0.35; } }, REDUCED ? 200 : 1500);
+    } else if (FRAC[c.type]) setupDynamic(c);
+    else release();
+    if (sound && c.type !== 'drift') bell(sound);
+  }
+
+  function physics(t, dt) {
+    const K = REDUCED ? 0.008 : 0.016, damp = Math.pow(0.86, dt);
+    const wob = REDUCED ? 0.15 : 0.45 + energy * 2.6;
+    const drift = REDUCED ? 0.02 : 0.05;
+    for (let i = 0; i < N; i++) {
+      let ax, ay;
+      if (has[i]) {
+        const p = ph[i] * 40;
+        ax = (tx[i] + Math.sin(t * 1.7 + p) * wob - px[i]) * K * kmul[i];
+        ay = (ty[i] + Math.cos(t * 1.3 + p * 0.8) * wob - py[i]) * K * kmul[i];
+      } else {
+        const a = Math.sin(px[i] * 0.0045 + t * 0.21) * 2.1 + Math.cos(py[i] * 0.0052 - t * 0.17) * 2.1 + ph[i] * 0.8;
+        ax = Math.cos(a) * drift;
+        ay = Math.sin(a) * drift - 0.006;
+      }
+      vx[i] = (vx[i] + ax * dt) * damp;
+      vy[i] = (vy[i] + ay * dt) * damp;
+      px[i] += vx[i] * dt;
+      py[i] += vy[i] * dt;
+      if (!has[i]) {
+        if (px[i] < -12) px[i] += W + 24; else if (px[i] > W + 12) px[i] -= W + 24;
+        if (py[i] < -12) py[i] += H + 24; else if (py[i] > H + 12) py[i] -= H + 24;
+      }
+    }
+  }
+  function draw() {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = cue.type === 'image' ? 'rgba(0,0,0,.45)' : 'rgba(0,0,0,.26)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = Math.max(0.05, Math.min(1, pAlpha));
+    const boost = (1 + energy * 0.55) * (cue.type === 'image' ? 0.72 : 1);
+    for (let i = 0; i < N; i++) {
+      const r = rad[i] * boost * dsc[i];
+      ctx.drawImage(SPRITES[colr[i]], px[i] - r, py[i] - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ================= music ================= */
+  const BPM = 72, EIGHTH = 60 / BPM / 2;
+  const C = (name, pad, bass, tones) => ({ name, pad, bass, tones });
+  const DMAJ9 = C('Dmaj9', [50, 57, 61, 64, 66], 38, [62, 66, 69, 73, 76]);
+  const BM9 = C('Bm9', [47, 54, 57, 61, 62], 35, [59, 62, 66, 69, 73]);
+  const GMAJ9 = C('Gmaj9', [43, 50, 54, 57, 59], 31, [55, 59, 62, 66, 69]);
+  const A7SUS = C('A7sus4', [45, 52, 55, 62, 64], 33, [57, 62, 64, 67, 69]);
+  const GMAJ7 = C('Gmaj7', [43, 50, 54, 59, 62], 31, [55, 59, 62, 66, 67]);
+  const EM9 = C('Em9', [40, 50, 54, 55, 59], 28, [59, 62, 64, 66, 67]);
+  const FSM7 = C('F♯m7', [42, 49, 52, 57, 61], 30, [61, 64, 66, 69, 73]);
+  const D_FS = C('D/F♯', [42, 50, 57, 62, 64], 30, [62, 66, 69, 74, 76]);
+  const A7 = C('A7', [45, 52, 55, 61, 64], 33, [57, 61, 64, 67, 69]);
+  const MOODS = {
+    warm: { prog: [DMAJ9, BM9, GMAJ9, A7SUS], density: 1, lo: 0, hi: 8 },
+    inward: { prog: [BM9, GMAJ7, EM9, FSM7], density: 0.55, lo: 0, hi: 6 },
+    hush: { prog: [BM9, GMAJ7, EM9, FSM7], density: 0.22, lo: 0, hi: 4 },
+    resolve: { prog: [GMAJ9, D_FS, EM9, A7], density: 0.85, lo: 1, hi: 8 },
+  };
+  const PENTA = [62, 64, 66, 69, 71, 74, 76, 78, 81];
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  let actx = null, limiter = null, voiceBus = null, IR = null, music = null, gen = 0;
+  const ana = { node: null, buf: null };
+  let schedTimer = 0, nextNote = 0, stepN = 0, walk = 4, chordLog = [], musicEnd = Infinity, bellIdx = 0;
+  let curMood = 'warm', pendingMood = 'warm', barN = 0, curChord = null;
+
+  function makeIR(sec) {
+    const rate = actx.sampleRate, len = Math.floor(sec * rate);
+    const buf = actx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        lp += (Math.random() * 2 - 1 - lp) * (0.4 - 0.3 * t);
+        d[i] = lp * Math.pow(1 - t, 2.4) * (i < rate * 0.012 ? i / (rate * 0.012) : 1);
+      }
+    }
+    return buf;
+  }
+  function ensureAudio() {
+    if (actx) return actx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try { actx = new AC({ latencyHint: 'playback' }); } catch (e) { try { actx = new AC(); } catch (e2) { return null; } }
+    limiter = actx.createDynamicsCompressor();
+    limiter.threshold.value = -4; limiter.knee.value = 4; limiter.ratio.value = 14;
+    limiter.attack.value = 0.003; limiter.release.value = 0.2;
+    limiter.connect(actx.destination);
+    voiceBus = actx.createGain();
+    voiceBus.gain.value = 1;
+    voiceBus.connect(limiter);
+    const an = actx.createAnalyser();
+    an.fftSize = 1024;
+    ana.node = an;
+    ana.buf = new Float32Array(an.fftSize);
+    // One silent frame inside the tap unlocks audio on iOS.
+    const b = actx.createBuffer(1, 1, actx.sampleRate), s = actx.createBufferSource();
+    s.buffer = b; s.connect(actx.destination); s.start(0);
+    IR = makeIR(3.2);
+    return actx;
+  }
+  function gain(v) { const g = actx.createGain(); g.gain.value = v; return g; }
+  function buildMusic() {
+    const bus = gain(0.0001);
+    const glue = actx.createDynamicsCompressor();
+    glue.threshold.value = -20; glue.ratio.value = 2.5; glue.attack.value = 0.02; glue.release.value = 0.3;
+    bus.connect(glue); glue.connect(limiter); glue.connect(ana.node);
+    const verb = actx.createConvolver();
+    verb.buffer = IR;
+    const verbOut = gain(0.5); verb.connect(verbOut); verbOut.connect(bus);
+    const dly = actx.createDelay(2); dly.delayTime.value = (60 / BPM) * 0.75;
+    const fb = gain(0.32), dlp = actx.createBiquadFilter();
+    dlp.type = 'lowpass'; dlp.frequency.value = 2600;
+    dly.connect(dlp); dlp.connect(fb); fb.connect(dly);
+    const dOut = gain(0.35); dlp.connect(dOut); dOut.connect(bus); dOut.connect(verb);
+    const pad = gain(0.9); pad.connect(bus); const padSend = gain(0.55); pad.connect(padSend); padSend.connect(verb);
+    const arp = gain(0.9); arp.connect(bus); arp.connect(dly); const arpSend = gain(0.45); arp.connect(arpSend); arpSend.connect(verb);
+    const bass = gain(1); bass.connect(bus);
+    const bellBus = gain(0.8); bellBus.connect(bus); const bellSend = gain(0.7); bellBus.connect(bellSend); bellSend.connect(verb);
+    return { bus, glue, pad, arp, bass, bell: bellBus };
+  }
+  function teardownMusic(m) {
+    if (!m || !actx) return;
+    const t = actx.currentTime, g = m.bus.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(0, t + 0.25);
+    setTimeout(() => { try { m.glue.disconnect(); } catch (e) { /* already gone */ } }, 500);
+  }
+  function pad(ch, t, dur, out) {
+    const end = t + dur;
+    for (const m of ch.pad) {
+      const f = mtof(m);
+      const o1 = actx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = f;
+      const o2 = actx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = f; o2.detune.value = (Math.random() * 2 - 1) * 8;
+      const g2 = gain(0.2);
+      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5;
+      lp.frequency.setValueAtTime(600, t);
+      lp.frequency.linearRampToValueAtTime(1500, t + dur * 0.55);
+      lp.frequency.linearRampToValueAtTime(700, end + 2);
+      const env = gain(0);
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(0.05, t + 1.8);
+      env.gain.setValueAtTime(0.05, end - 0.1);
+      env.gain.linearRampToValueAtTime(0, end + 2.2);
+      o1.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(env); env.connect(out.pad);
+      o1.start(t); o2.start(t); o1.stop(end + 2.3); o2.stop(end + 2.3);
+    }
+  }
+  function bassNote(ch, t, dur, out) {
+    const end = t + dur;
+    const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = mtof(ch.bass);
+    const o2 = actx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = mtof(ch.bass + 12);
+    const g2 = gain(0.12), env = gain(0);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.16, t + 0.9);
+    env.gain.setValueAtTime(0.16, end - 0.3);
+    env.gain.linearRampToValueAtTime(0, end + 0.6);
+    o.connect(env); o2.connect(g2); g2.connect(env); env.connect(out.bass);
+    o.start(t); o2.start(t); o.stop(end + 0.7); o2.stop(end + 0.7);
+  }
+  function pluck(m, t, vel, out) {
+    const f = mtof(m);
+    const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+    const o2 = actx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = f * 2;
+    const g2 = gain(0.16), env = gain(0.0001);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.1 * vel, t + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    let dest = env;
+    if (actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = Math.random() * 0.8 - 0.4; env.connect(p); dest = p; }
+    o.connect(env); o2.connect(g2); g2.connect(env); dest.connect(out.arp);
+    o.start(t); o2.start(t); o.stop(t + 1.4); o2.stop(t + 1.4);
+  }
+  function currentChord() {
+    if (!actx) return null;
+    const now = actx.currentTime;
+    for (let i = chordLog.length - 1; i >= 0; i--) if (chordLog[i].t <= now) return chordLog[i].ch;
+    return null;
+  }
+  function bell(vel) {
+    if (!actx || !music || state !== 'playing') return;
+    const t = actx.currentTime + 0.03;
+    const ch = currentChord() || DMAJ9;
+    const f = mtof(ch.tones[(bellIdx++ * 2 + 1) % ch.tones.length] + 12);
+    const car = actx.createOscillator(); car.type = 'sine'; car.frequency.value = f;
+    const mod = actx.createOscillator(); mod.type = 'sine'; mod.frequency.value = f * 3.5;
+    const idx = gain(f * 1.6);
+    idx.gain.setValueAtTime(f * 1.6, t);
+    idx.gain.exponentialRampToValueAtTime(f * 0.05, t + 1.6);
+    mod.connect(idx); idx.connect(car.frequency);
+    const env = gain(0.0001);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.05 * (typeof vel === 'number' ? vel : 1), t + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
+    car.connect(env); env.connect(music.bell);
+    car.start(t); mod.start(t); car.stop(t + 2.9); mod.stop(t + 2.9);
+  }
+  function step(i, t, out) {
+    const pos = i % 16;
+    if (pos === 0) {
+      if (pendingMood !== curMood) { curMood = pendingMood; barN = 0; }
+      const M = MOODS[curMood] || MOODS.warm;
+      curChord = M.prog[barN % M.prog.length];
+      barN++;
+      pad(curChord, t, 16 * EIGHTH, out);
+      bassNote(curChord, t, 16 * EIGHTH, out);
+      chordLog.push({ t, ch: curChord });
+      if (chordLog.length > 8) chordLog.shift();
+    }
+    if (i < 8 || !curChord) return; // let the pad breathe before the melody comes in
+    const M = MOODS[curMood] || MOODS.warm, strong = pos % 4 === 0;
+    if (Math.random() < (strong ? 0.72 : 0.38) * M.density) {
+      const moves = [-2, -1, -1, 1, 1, 2];
+      walk = Math.max(M.lo, Math.min(M.hi, walk + moves[(Math.random() * moves.length) | 0]));
+      let note = PENTA[walk];
+      if (strong) note = curChord.tones.reduce((a, b) => (Math.abs(b - note) < Math.abs(a - note) ? b : a), curChord.tones[0]);
+      const swing = i % 2 ? EIGHTH * 0.1 : 0;
+      pluck(note, t + swing + (Math.random() - 0.5) * 0.01, strong ? 0.75 + Math.random() * 0.25 : 0.4 + Math.random() * 0.35, out);
+    }
+  }
+  function startScheduler(t0, g) {
+    stopScheduler();
+    nextNote = t0; stepN = 0; walk = 4; chordLog = []; barN = 0; curChord = null;
+    const out = music;
+    const tick = () => {
+      if (g !== gen || !music) { stopScheduler(); return; }
+      const horizon = actx.currentTime + 0.18;
+      while (nextNote < horizon) {
+        if (nextNote > musicEnd) { stopScheduler(); return; }
+        step(stepN, nextNote, out);
+        nextNote += EIGHTH;
+        stepN++;
+      }
+    };
+    schedTimer = setInterval(tick, 25);
+    tick();
+  }
+  function stopScheduler() { clearInterval(schedTimer); schedTimer = 0; }
+  function duck(g, t0, ns, t, from) {
+    const inLine = from >= 0 && t.lines.some((l) => from >= l.start - 0.15 && from <= l.end + 0.05);
+    const up = from < 0 ? 2.0 : 1.0;
+    g.cancelScheduledValues(t0);
+    g.setValueAtTime(0.0001, t0);
+    g.exponentialRampToValueAtTime(inLine ? 0.36 : 0.8, t0 + up);
+    const tMin = t0 + up + 0.02;
+    for (const l of t.lines) {
+      const s = ns + l.start - 0.15, e = ns + l.end + 0.05;
+      if (e <= tMin) continue;
+      g.setTargetAtTime(0.36, Math.max(s, tMin), 0.08);
+      g.setTargetAtTime(0.8, e, 0.35);
+    }
+    const end = Math.max(ns + t.duration, tMin + 0.05);
+    g.setTargetAtTime(1.0, end, 0.8);
+    g.setTargetAtTime(0.0001, end + 8, 1.8);
+  }
+
+  /* ================= narration, one chapter of audio at a time ================= */
+  const segCache = new Map();
+  let segSources = [];
+  function decode(ab) {
+    return new Promise((res, rej) => {
+      const p = actx.decodeAudioData(ab, res, rej);
+      if (p && typeof p.then === 'function') p.then(res, rej);
+    });
+  }
+  function segAt(t) { let k = 0; V().segs.forEach((s, i) => { if (s.t <= t) k = i; }); return k; }
+  function loadSeg(k) {
+    const key = `${lang}|${voice}|${k}`;
+    for (const kk of [...segCache.keys()]) {
+      const p = kk.split('|');
+      if (p[0] !== lang || p[1] !== voice || +p[2] < k - 1 || +p[2] > k + 1) segCache.delete(kk);
+    }
+    if (!segCache.has(key)) {
+      const seg = V().segs[k];
+      const bytes = seg.b64
+        ? Promise.resolve().then(() => b64ToBuf(seg.b64))
+        : fetch(seg.url).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+      const p = bytes.then(decode);
+      p.catch(() => segCache.delete(key));
+      segCache.set(key, p);
+    }
+    return segCache.get(key);
+  }
+  function stopVoice() {
+    segSources.forEach((s) => { try { s.stop(); } catch (e) { /* not started */ } });
+    segSources = [];
+  }
+  function startSeg(buf, when, offset) {
+    const now = actx.currentTime + 0.02;
+    if (when < now) { offset += now - when; when = now; }
+    if (offset >= buf.duration) return;
+    const s = actx.createBufferSource();
+    s.buffer = buf;
+    s.connect(voiceBus);
+    s.start(when, offset);
+    segSources.push(s);
+    s.onended = () => { segSources = segSources.filter((x) => x !== s); };
+  }
+  const waitFor = (t, g) => new Promise((res) => {
+    const check = () => (g !== gen || actx.currentTime >= t ? res() : setTimeout(check, 250));
+    check();
+  });
+  async function playSegments(from, g) {
+    const segs = V().segs;
+    let k = segAt(Math.max(0, from));
+    try {
+      let buf = await loadSeg(k);
+      if (g !== gen) return;
+      const off0 = Math.max(0, from - segs[k].t);
+      startSeg(buf, narrStart + segs[k].t + off0, off0);
+      for (k += 1; k < segs.length; k++) {
+        await waitFor(narrStart + segs[k].t - 4, g); // decode the next chapter shortly before it starts
+        if (g !== gen) return;
+        buf = await loadSeg(k);
+        if (g !== gen) return;
+        startSeg(buf, narrStart + segs[k].t, 0);
+      }
+    } catch (e) {
+      if (g === gen) { noteEl.textContent = S().captionsOnly; noteEl.hidden = false; }
+    }
+  }
+
+  /* ================= sequence ================= */
+  const clock = () => (actx ? actx.currentTime : performance.now() / 1000);
+  const narrTime = () => (tl ? clock() - narrStart : -1);
+  function fmt(s) { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+  function chaptersOf(t) {
+    const out = [];
+    t.lines.forEach((l, idx) => { if (l.chapter) out.push({ name: l.chapter, start: l.start, idx, num: out.length + 1 }); });
+    return out;
+  }
+  function buildEvents(t) {
+    const ev = [];
+    t.lines.forEach((line, idx) => {
+      ev.push({ t: line.start, kind: 'line', line, idx });
+      if (line.music) ev.push({ t: Math.max(-LEAD - 1, line.start - 3.3), kind: 'mood', mood: line.music });
+      (line.caps || []).slice(1).forEach((c) => ev.push({ t: c.t, kind: 'cap', text: c.text }));
+      (line.subcues || []).forEach((s) => ev.push({ t: s.t, kind: 'cue', cue: s.cue }));
+    });
+    return ev.sort((a, b) => a.t - b.t);
+  }
+  const firstCap = (line) => (line.caps ? line.caps[0].text : line.caption);
+  function setCaption(text, instant) {
+    clearTimeout(capTimer);
+    if (instant || REDUCED) { capEl.textContent = text; capEl.classList.remove('swap'); return; }
+    capEl.classList.add('swap');
+    capTimer = setTimeout(() => { capEl.textContent = text; capEl.classList.remove('swap'); }, 140);
+  }
+  function markLine(i) {
+    const prev = document.querySelector('.line-btn.now');
+    if (prev) prev.classList.remove('now');
+    const b = document.querySelector(`.line-btn[data-i="${i}"]`);
+    if (b) b.classList.add('now');
+  }
+  function showChapter(lineIdx, fresh) {
+    const ch = CHAPTERS.find((c) => c.idx === lineIdx);
+    if (!ch) return;
+    chapterNum.textContent = `${ch.num} / ${CHAPTERS.length}`;
+    chapterName.textContent = ch.name;
+    chapterCard.hidden = false;
+    clearTimeout(cardTimer);
+    if (fresh && !REDUCED) {
+      chapterCard.classList.add('fresh');
+      cardTimer = setTimeout(() => chapterCard.classList.remove('fresh'), 2600);
+    } else chapterCard.classList.remove('fresh');
+    nextBtn.disabled = ch.num >= CHAPTERS.length;
+  }
+  function fire(e) {
+    if (e.kind === 'line') {
+      setCaption(firstCap(e.line));
+      markLine(e.idx);
+      if (e.line.chapter) showChapter(e.idx, true);
+      if (e.line.cue) applyCue(e.line.cue, 1);
+    } else if (e.kind === 'cap') setCaption(e.text);
+    else if (e.kind === 'mood') pendingMood = e.mood;
+    else applyCue(e.cue, 0.6);
+  }
+  function sequence(nt) {
+    while (evi < events.length && events[evi].t <= nt) fire(events[evi++]);
+    tcEl.textContent = `${fmt(nt)} / ${fmt(tl.duration)}`;
+    progBar.style.width = `${Math.max(0, Math.min(100, (nt / tl.duration) * 100))}%`;
+    const ch = currentChord();
+    if (ch && chordEl.textContent !== ch.name) chordEl.textContent = ch.name;
+    if (nt > tl.duration + 1.4) finish();
+  }
+
+  async function start(from) {
+    if (state === 'loading') return;
+    if (typeof from !== 'number') from = -LEAD;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
+    ensureAudio();
+    const resuming = actx && actx.state !== 'running' ? actx.resume() : null; // must be called inside the tap
+    state = 'loading';
+    playBtn.disabled = replayBtn.disabled = swapBtn.disabled = swapLangBtn.disabled = true;
+    playLabel.textContent = S().ready;
+    if (resuming) { try { await resuming; } catch (e) { /* keep going with captions */ } }
+    let ok = false;
+    if (actx) { try { await loadSeg(segAt(Math.max(0, from))); ok = true; } catch (e) { ok = false; } }
+    begin(ok, from);
+  }
+
+  function begin(ok, from) {
+    gen++;
+    const g = gen;
+    tl = V().timeline;
+    voiceReady = ok;
+    teardownMusic(music);
+    music = null;
+    stopVoice();
+    state = 'playing';
+    intro.hidden = true; outro.hidden = true;
+    capBox.hidden = false; transport.hidden = false; progress.hidden = false;
+    noteEl.textContent = !actx ? S().noSound : ok ? '' : S().captionsOnly;
+    noteEl.hidden = !noteEl.textContent;
+    pauseBtn.hidden = !actx;
+    pauseBtn.classList.remove('paused');
+    pauseBtn.setAttribute('aria-label', S().pause);
+
+    // Catch up silently to `from`: caption, chapter, visual and mood as they would be at that moment.
+    events = buildEvents(tl);
+    evi = 0;
+    let lastLine = null, lastCap = '', lastCue = null, lastChapter = -1, mood = 'warm';
+    while (evi < events.length && events[evi].t <= from) {
+      const e = events[evi++];
+      if (e.kind === 'line') { lastLine = e; lastCap = firstCap(e.line); if (e.line.cue) lastCue = e.line.cue; if (e.line.chapter) lastChapter = e.idx; }
+      else if (e.kind === 'cap') lastCap = e.text;
+      else if (e.kind === 'cue') lastCue = e.cue;
+      else if (e.kind === 'mood') mood = e.mood;
+    }
+    curMood = pendingMood = mood;
+
+    const t0 = clock(), startAt = t0 + 0.12;
+    narrStart = startAt - from;
+    musicEnd = narrStart + tl.duration + 12;
+    if (actx) {
+      music = buildMusic();
+      duck(music.bus.gain, t0, narrStart, tl, from);
+      startScheduler(t0 + 0.06, g);
+    }
+    if (ok) playSegments(from, g);
+    setCaption(lastCap, true);
+    markLine(lastLine ? lastLine.idx : -1);
+    if (lastChapter >= 0) showChapter(lastChapter, false);
+    else { chapterCard.hidden = true; nextBtn.disabled = CHAPTERS.length === 0; }
+    applyCue(lastCue || { type: 'drift' }, 0);
+    playBtn.disabled = replayBtn.disabled = swapBtn.disabled = swapLangBtn.disabled = false;
+    playLabel.textContent = TX().play || S().play;
+    requestWake();
+  }
+
+  function finish() {
+    state = 'ended';
+    capBox.hidden = true; transport.hidden = true; progress.hidden = true; chapterCard.hidden = true;
+    renderOutro();
+    outro.hidden = false;
+    markLine(-1);
+    // Keep the last word on screen (re-placed above the outro panel) unless the script names one.
+    const word = TX().outro_word;
+    applyCue(word ? { type: 'text', value: word } : cue.type === 'text' ? cue : { type: 'text', value: lang === 'es' ? 'fin' : 'the end' }, 0);
+    releaseWake();
+  }
+
+  function playFrom(from) {
+    if (state === 'rest' || state === 'loading' || !actx) { start(from); return; }
+    const go = () => {
+      if (voiceReady) loadSeg(segAt(Math.max(0, from))).then(() => begin(true, from), () => begin(false, from));
+      else begin(false, from);
+    };
+    if (actx.state !== 'running') actx.resume().then(go, go); else go();
+  }
+  function nextChapter() {
+    if (!tl) return;
+    const nt = narrTime();
+    const nx = CHAPTERS.find((c) => c.start > nt + 0.6);
+    if (nx) playFrom(Math.max(0, nx.start - 0.3));
+  }
+  async function togglePause() {
+    if (!actx) return;
+    if (state === 'playing') {
+      state = 'paused';
+      pauseBtn.classList.add('paused');
+      pauseBtn.setAttribute('aria-label', S().resume);
+      releaseWake();
+      try { await actx.suspend(); } catch (e) { /* ignore */ }
+    } else if (state === 'paused') {
+      try { await actx.resume(); } catch (e) { /* ignore */ }
+      state = 'playing';
+      pauseBtn.classList.remove('paused');
+      pauseBtn.setAttribute('aria-label', S().pause);
+      requestWake();
+    }
+  }
+  let wake = null;
+  async function requestWake() {
+    try {
+      if ('wakeLock' in navigator && !wake) {
+        wake = await navigator.wakeLock.request('screen');
+        wake.addEventListener('release', () => { wake = null; });
+      }
+    } catch (e) { wake = null; }
+  }
+  function releaseWake() { try { if (wake) wake.release(); } catch (e) { /* ignore */ } wake = null; }
+
+  /* ================= text, pickers and notes ================= */
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const setText = (id, text) => { const e = $(id); if (e) { e.textContent = text || ''; e.hidden = !text; } };
+  const otherVoice = () => L().order.find((v) => v !== voice);
+  const otherLang = () => SHOW.languages.find((l) => l !== lang);
+
+  function chips(host, name, items, current, onPick) {
+    host.textContent = '';
+    items.forEach(([value, label]) => {
+      const lab = el('label', 'chip');
+      const input = el('input');
+      input.type = 'radio'; input.name = name; input.id = `${name}-${value}`; input.value = value; input.checked = value === current;
+      input.addEventListener('change', () => { if (input.checked) onPick(value); });
+      lab.append(input, el('span', null, label));
+      host.append(lab);
+    });
+  }
+  function renderIntro() {
+    const s = S(), t = TX();
+    document.documentElement.lang = lang;
+    document.title = t.title;
+    setText('intro-eyebrow', t.eyebrow);
+    $('intro-title').textContent = t.title;
+    setText('intro-lede', t.lede);
+    playLabel.textContent = t.play || s.play;
+    $('transcript-link').textContent = s.readTranscript;
+    const langPicker = $('lang-picker');
+    langPicker.hidden = SHOW.languages.length < 2;
+    $('lang-legend').textContent = s.language;
+    chips($('lang-chips'), 'lang', SHOW.languages.map((l) => [l, LANG_NAMES[l] || l]), lang, setLang);
+    $('voice-picker').hidden = L().order.length < 2;
+    $('voice-legend').textContent = t.voice_prompt || s.voice;
+    chips($('voice-chips'), 'voice', L().order.map((v) => [v, L().voices[v].label]), voice, setVoice);
+    pauseBtn.setAttribute('aria-label', s.pause);
+    nextBtn.setAttribute('aria-label', s.next);
+    $('chord-label').textContent = s.chord;
+    tcEl.textContent = `0:00 / ${fmt(V().timeline.duration)}`;
+  }
+  function renderOutro() {
+    const s = S(), t = TX();
+    setText('outro-eyebrow', t.outro_eyebrow || s.theEnd);
+    $('outro-title').textContent = t.outro_title || s.outroTitle;
+    setText('outro-text', t.outro_text);
+    $('replay-label').textContent = s.playAgain;
+    const ov = otherVoice(), ol = otherLang();
+    swapBtn.hidden = !ov;
+    if (ov) swapBtn.textContent = fill(s.hearAs, { name: L().voices[ov].label });
+    swapLangBtn.hidden = !ol;
+    if (ol) swapLangBtn.textContent = LANG_NAMES[ol] || ol;
+    $('notes-link').textContent = s.notesLink;
+  }
+  function renderNotes() {
+    const s = S(), t = TX(), host = $('notes');
+    host.textContent = '';
+    const head = el('header', 'notes-head');
+    head.append(el('p', 'eyebrow', s.notesEyebrow), el('h2', null, s.notesTitle));
+    if (t.notes) head.append(el('p', null, t.notes));
+    host.append(head);
+
+    const spec = (dl, k, v) => { const d = el('div'); d.append(el('dt', null, k), el('dd', null, v)); dl.append(d); return d; };
+    const credit = (label, title, text, rows) => {
+      const a = el('article', 'credit');
+      a.append(el('p', 'label', label), el('h3', null, title), el('p', null, text));
+      const dl = el('dl', 'specs');
+      rows(dl);
+      a.append(dl);
+      return a;
+    };
+    const credits = el('div', 'credits');
+    credits.append(credit(s.voiceLabel, s.voiceTitle, fill(s.voiceText, { n: V().timeline.lines.length }), (dl) => {
+      spec(dl, s.specModel, 'Kokoro-82M, Apache 2.0');
+      spec(dl, s.specVoices, L().order.map((v) => L().voices[v].label).join(' · '));
+      spec(dl, s.specLength, L().order.map((v) => fmt(L().voices[v].timeline.duration)).join(' · '));
+    }));
+    const moods = [...new Set(V().timeline.lines.filter((l) => l.music).map((l) => l.music))];
+    credits.append(credit(s.musicLabel, s.musicTitle, s.musicText, (dl) => {
+      spec(dl, s.specTempo, '72 BPM');
+      moods.forEach((m) => spec(dl, s.moods[m] || m, (MOODS[m] || MOODS.warm).prog.map((c) => c.name).join(' · ')));
+    }));
+    const cues = V().timeline.lines.reduce((n, l) => n + (l.cue ? 1 : 0) + (l.subcues ? l.subcues.length : 0), 0);
+    credits.append(credit(s.lightLabel, s.lightTitle, s.lightText, (dl) => {
+      spec(dl, s.specParticles, fill(s.onScreen, { n: N.toLocaleString(lang) })).querySelector('dd').id = 'spec-n';
+      spec(dl, s.specCues, fill(s.perPlay, { n: cues }));
+      spec(dl, s.specFps, fill(s.fpsLive, { n: Math.round(fpsAvg) })).querySelector('dd').id = 'spec-fps';
+    }));
+    host.append(credits);
+
+    const keys = Object.keys(SHOW.images || {});
+    if (keys.length) {
+      const plates = el('div', 'plates');
+      keys.forEach((k) => {
+        const img = SHOW.images[k], info = (t.images || {})[k] || {};
+        const fig = el('figure', 'plate');
+        const im = el('img');
+        im.src = img.src; im.alt = info.alt || ''; im.loading = 'lazy';
+        if (img.w) { im.width = img.w; im.height = img.h; }
+        const cap = el('figcaption');
+        if (info.title) cap.append(el('h3', null, info.title));
+        if (info.caption) cap.append(el('p', null, info.caption));
+        fig.append(im, cap);
+        plates.append(fig);
+      });
+      host.append(plates);
+    }
+
+    const tr = el('section', 'transcript');
+    tr.id = 'transcript';
+    tr.append(el('h2', null, s.transcript), el('p', null, s.tapLine));
+    let sec = null, ol = null;
+    V().timeline.lines.forEach((l, i) => {
+      if (l.chapter || !sec) {
+        sec = el('section', 'tr-chapter');
+        const h = el('h3');
+        const ch = CHAPTERS.find((c) => c.idx === i);
+        h.append(el('span', null, ch ? `${ch.num} / ${CHAPTERS.length}` : ''), document.createTextNode(l.chapter || ''));
+        ol = el('ol');
+        sec.append(h, ol);
+        tr.append(sec);
+      }
+      const b = el('button', 'line-btn');
+      b.type = 'button';
+      b.dataset.i = i;
+      const tm = el('time', null, fmt(l.start));
+      b.append(tm, el('span', null, l.caption));
+      b.addEventListener('click', () => {
+        playFrom(Math.max(0, l.start - 0.25));
+        stage.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+      });
+      const li = el('li');
+      li.append(b);
+      ol.append(li);
+    });
+    host.append(tr);
+
+    const foot = el('footer', 'colophon');
+    if (t.colophon) foot.append(el('p', null, t.colophon));
+    if (SHOW.single) {
+      const p = el('p'), a = el('a', null, s.download);
+      a.href = SHOW.single; a.setAttribute('download', '');
+      p.append(a);
+      foot.append(p);
+    }
+    if (foot.childNodes.length) host.append(foot);
+  }
+  function renderAll() {
+    CHAPTERS = chaptersOf(V().timeline);
+    renderIntro();
+    renderOutro();
+    renderNotes();
+  }
+  function setVoice(v) {
+    voice = v;
+    renderAll();
+  }
+  function setLang(l) {
+    lang = l;
+    voice = L().order[0];
+    renderAll();
+    if (state === 'rest') applyCue({ type: 'text', value: TX().idle || (lang === 'es' ? 'hola' : 'hello') }, 0);
+  }
+
+  /* ================= loop & wiring ================= */
+  let last = 0, fpsAvg = 60;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const rawDt = now - last;
+    last = now;
+    const dt = Math.min(3, Math.max(0.2, rawDt / 16.667));
+    if (rawDt > 0 && rawDt < 250) fpsAvg += (1000 / rawDt - fpsAvg) * 0.05;
+    const t = now / 1000;
+    let lv = 0;
+    if (ana.node && state === 'playing') {
+      ana.node.getFloatTimeDomainData(ana.buf);
+      let s = 0;
+      for (let i = 0; i < ana.buf.length; i++) s += ana.buf[i] * ana.buf[i];
+      lv = Math.min(1, Math.sqrt(s / ana.buf.length) * 5);
+    }
+    level += (lv - level) * 0.1;
+    let ve = 0;
+    if (tl && state === 'playing') {
+      const nt = narrTime();
+      const ch = nt >= 0 ? tl.env.charAt(Math.floor(nt * tl.envFps)) : '';
+      if (ch) ve = parseInt(ch, 36) / 35;
+      sequence(nt);
+    }
+    vEnv += (ve - vEnv) * 0.3;
+    energy = Math.max(vEnv * 0.85, level * 0.9);
+    if (FRAC[cue.type]) dynTargets(t);
+    pAlpha += (pAlphaT - pAlpha) * 0.04;
+    physics(t, dt);
+    draw();
+  }
+
+  playBtn.addEventListener('click', () => start());
+  replayBtn.addEventListener('click', () => { state = 'ended'; start(); });
+  swapBtn.addEventListener('click', () => { const v = otherVoice(); if (v) setVoice(v); state = 'ended'; start(); });
+  swapLangBtn.addEventListener('click', () => { const l = otherLang(); if (l) setLang(l); state = 'ended'; start(); });
+  pauseBtn.addEventListener('click', togglePause);
+  nextBtn.addEventListener('click', nextChapter);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') togglePause(); });
+  setInterval(() => { const f = $('spec-fps'); if (f) f.textContent = fill(S().fpsLive, { n: Math.round(fpsAvg) }); }, 1000);
+
+  renderAll();
+  cue = { type: 'text', value: TX().idle || (lang === 'es' ? 'hola' : 'hello') };
+  resize();
+  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage);
+  else window.addEventListener('resize', resize);
+  const fontsReady = document.fonts && document.fonts.load ? document.fonts.load('800 100px "Bricolage Grotesque"') : Promise.resolve();
+  Promise.race([fontsReady, new Promise((r) => setTimeout(r, 2500))]).then(() => { if (cue.type === 'text') applyCue(cue, 0); }, () => {});
+  requestAnimationFrame((n) => { last = n; frame(n); });
+})();
+
+</script>
+</body>
+</html>

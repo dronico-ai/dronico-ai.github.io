@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+{{og_image}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;500&display=swap">
+<style>
+{{css}}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="field" aria-hidden="true"></canvas>
+  <img id="render-view" class="render-view" alt="" aria-hidden="true">
+  <div class="progress" id="progress" hidden><span id="progress-bar"></span></div>
+  <div class="chapter-card" id="chapter-card" hidden>
+    <p class="eyebrow" id="chapter-num"></p>
+    <p class="chapter-name" id="chapter-name"></p>
+  </div>
+
+  <section class="panel" id="intro" aria-labelledby="intro-title">
+    <div class="panel-inner">
+      <p class="eyebrow" id="intro-eyebrow"></p>
+      <h1 id="intro-title">{{title}}</h1>
+      <p class="lede" id="intro-lede"></p>
+      <div class="pickers">
+        <fieldset class="picker" id="lang-picker" hidden><legend id="lang-legend"></legend><div class="chips" id="lang-chips"></div></fieldset>
+        <fieldset class="picker" id="voice-picker"><legend id="voice-legend"></legend><div class="chips" id="voice-chips"></div></fieldset>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="play"><span class="tri" aria-hidden="true"></span><span id="play-label"></span></button>
+        <a class="quiet-link" href="#transcript" id="transcript-link"></a>
+      </div>
+    </div>
+  </section>
+
+  <div class="captions" id="captions" hidden><p class="caption" id="caption" aria-live="polite"></p></div>
+
+  <section class="panel" id="outro" hidden aria-labelledby="outro-title">
+    <div class="panel-inner">
+      <p class="eyebrow" id="outro-eyebrow"></p>
+      <h2 id="outro-title"></h2>
+      <p class="lede" id="outro-text"></p>
+      <div class="actions">
+        <button type="button" class="btn" id="replay"><span class="tri" aria-hidden="true"></span><span id="replay-label"></span></button>
+        <button type="button" class="btn btn-ghost" id="swap-voice"></button>
+        <button type="button" class="btn btn-ghost" id="swap-lang"></button>
+        <a class="quiet-link" href="#notes" id="notes-link"></a>
+      </div>
+    </div>
+  </section>
+
+  <div class="transport" id="transport" hidden>
+    <button type="button" class="t-btn" id="pause"><span class="ico" aria-hidden="true"></span></button>
+    <button type="button" class="t-btn" id="next"><span class="ico-next" aria-hidden="true"></span></button>
+    <span class="tc" id="tc">0:00 / 0:00</span>
+    <span class="t-note" id="t-note" hidden></span>
+    <span class="chord-wrap"><span class="chord-label" id="chord-label"></span> <span class="chord" id="chord"></span></span>
+  </div>
+</div>
+
+<main class="notes" id="notes"></main>
+
+<script>window.SHOW = {{show_json}};</script>
+<script>
+{{js}}
+</script>
+</body>
+</html>

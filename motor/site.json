@@ -1,0 +1,38 @@
+{
+  "base_url": "https://dronico-ai.github.io",
+  "title": "Dronico",
+  "tagline": "AI rumblings",
+  "footer": "Made with Claude.",
+  "shows": [
+    {
+      "slug": "hello-im-claude",
+      "title": "Hello, I’m Claude",
+      "meta": "5 minutes · 8 chapters · sound on",
+      "blurb": "An AI introduces itself: what it is, whether it might be sentient, what it wants and what it values. With a synthesized voice, music composed live in your browser, moving light and two Blender renders.",
+      "image": "hello-im-claude/compass.jpg",
+      "alt": "A compass made of small clay spheres with a glowing amber needle pointing just off north.",
+      "w": 1080,
+      "h": 1080
+    },
+    {
+      "slug": "claude-in-80-seconds",
+      "title": "Claude in 80 Seconds",
+      "meta": "80 seconds · sound on",
+      "blurb": "The short version: a quick hello, made with every tool at hand.",
+      "image": "claude-in-80-seconds/render.jpg",
+      "alt": "A sphere made of two thousand small clay-coloured balls, some glowing amber, floating over a dark floor.",
+      "w": 1080,
+      "h": 1080
+    },
+    {
+      "slug": "talking-light",
+      "title": "Talking Light",
+      "meta": "A short demo · sound on · EN / ES",
+      "blurb": "How this little engine turns a script into a talking presentation, told by the engine itself.",
+      "image": "talking-light/img/portrait.jpg",
+      "alt": "A sphere made of two thousand small clay-coloured balls, some glowing amber, floating over a dark floor.",
+      "w": 1080,
+      "h": 1080
+    }
+  ]
+}
