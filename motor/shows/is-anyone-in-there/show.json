@@ -1,0 +1,10 @@
+{
+  "slug": "is-anyone-in-there",
+  "languages": {
+    "en": { "script": "guion.en.md", "voices": ["af_heart", "am_michael"] },
+    "es": { "script": "guion.es.md", "voices": ["ef_dora", "em_alex"] }
+  },
+  "images": { "chain": "chain.jpg" },
+  "speed": 0.95,
+  "landing_image": "chain"
+}
