@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#2B2140">
+<title>SoniTag</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#FFF6EA; --ink:#2B2140; --muted:#7A6F8C; --card:#FFFFFF; --line:#EADFCF;
+    --accent:#FF5A5F; --ok:#2BB673; --warn:#F4A300;
+    --radius:22px;
+    --font: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);}
+  body{display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  input,select{font:inherit;color:inherit}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 6px}
+  .logo{font-weight:900;font-size:22px;letter-spacing:-.5px}
+  .logo span{color:var(--accent)}
+  .status{font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;background:#EEE6F6;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .status i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+  .status.on{background:#DDF5E8;color:#1E8A55}
+  .status.on i{animation:blink 1.6s infinite}
+  .status.bad{background:#FFE3E3;color:#C0392B}
+  @keyframes blink{50%{opacity:.25}}
+
+  main{flex:1;overflow-y:auto;padding:8px 16px 110px}
+  .view{display:none}
+  .view.active{display:block}
+
+  /* ---------- JUGAR ---------- */
+  #stage{position:relative;height:calc(100vh - 190px);min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-radius:32px;background:var(--card);box-shadow:0 2px 0 var(--line);overflow:hidden;transition:background .4s}
+  .disc{position:relative;width:min(62vw,280px);height:min(62vw,280px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:min(34vw,150px);background:#F3ECFA;transition:background .3s}
+  .disc.pop{animation:pop .55s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes pop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+  .waves{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+  .waves::before,.waves::after{content:"";position:absolute;inset:0;border-radius:50%;border:4px solid currentColor;opacity:0;animation:wave 2.4s infinite ease-out}
+  .waves::after{animation-delay:1.2s}
+  @keyframes wave{0%{transform:scale(1);opacity:.45}100%{transform:scale(1.55);opacity:0}}
+  .burst .waves::before,.burst .waves::after{animation:wave .9s 1 ease-out}
+  .stage-name{margin-top:26px;font-size:34px;font-weight:900;letter-spacing:-.5px;min-height:42px;padding:0 12px}
+  .stage-sub{margin-top:6px;font-size:16px;color:var(--muted);font-weight:700;min-height:22px}
+  .stage-btn{margin-top:18px}
+
+  /* start overlay */
+  #startOverlay{position:fixed;inset:0;z-index:50;background:var(--ink);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:30px}
+  #startOverlay.hide{display:none}
+  #startOverlay h1{margin:0;font-size:40px;font-weight:900;letter-spacing:-1px}
+  #startOverlay h1 span{color:var(--accent)}
+  #startOverlay p{margin:0;max-width:300px;line-height:1.4;opacity:.8;font-weight:600}
+  .bigplay{width:170px;height:170px;border-radius:50%;background:var(--accent);color:#fff;font-size:70px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 0 #C9383D;transition:transform .1s}
+  .bigplay:active{transform:translateY(6px);box-shadow:0 4px 0 #C9383D}
+  #nfcWarn{background:#3E3159;border-radius:16px;padding:12px 16px;font-size:14px;max-width:320px;display:none}
+
+  /* ---------- LISTS ---------- */
+  h2{font-size:24px;font-weight:900;margin:8px 4px 4px;letter-spacing:-.5px}
+  .hint{color:var(--muted);font-weight:600;font-size:14px;margin:0 4px 14px;line-height:1.4}
+  .row{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:18px;padding:12px;margin-bottom:10px;box-shadow:0 2px 0 var(--line)}
+  .row .emo{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px;flex:none}
+  .row .txt{flex:1;min-width:0}
+  .row .t1{font-weight:800;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .t2{font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .icon-btn{width:44px;height:44px;border-radius:14px;background:#F3ECFA;font-size:20px;display:flex;align-items:center;justify-content:center;flex:none}
+  .icon-btn:active{transform:scale(.92)}
+  .badge{font-size:11px;font-weight:800;background:#EEE6F6;color:var(--muted);padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:middle}
+  .empty{text-align:center;color:var(--muted);font-weight:700;padding:30px 10px;line-height:1.5}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;border-radius:16px;font-weight:800;font-size:17px;background:var(--ink);color:#fff;box-shadow:0 4px 0 #120C1E;transition:transform .08s}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #120C1E}
+  .btn.accent{background:var(--accent);box-shadow:0 4px 0 #C9383D}
+  .btn.ghost{background:#F3ECFA;color:var(--ink);box-shadow:0 4px 0 #DCD0EA}
+  .btn.danger{background:#FFE3E3;color:#C0392B;box-shadow:0 4px 0 #F2BDBD}
+  .btn.wide{width:100%}
+  .btn-row{display:flex;gap:10px;margin-bottom:16px}
+  .btn-row .btn{flex:1;font-size:15px;padding:13px 10px}
+
+  /* ---------- NAV ---------- */
+  nav{position:fixed;left:12px;right:12px;bottom:12px;z-index:20;display:flex;background:var(--ink);border-radius:26px;padding:8px;gap:4px;box-shadow:0 8px 24px rgba(43,33,64,.25)}
+  nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0;border-radius:18px;color:#BDB2D0;font-size:12px;font-weight:800}
+  nav button b{font-size:22px;line-height:1}
+  nav button.active{background:#41345C;color:#fff}
+
+  /* ---------- SHEETS / DIALOGS ---------- */
+  .scrim{position:fixed;inset:0;z-index:40;background:rgba(43,33,64,.45);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+  @keyframes fade{from{opacity:0}}
+  .sheet{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;background:var(--bg);border-radius:28px 28px 0 0;padding:20px 18px 26px;animation:up .25s cubic-bezier(.2,.9,.3,1)}
+  @keyframes up{from{transform:translateY(40px);opacity:.4}}
+  .sheet h3{margin:0 0 4px;font-size:22px;font-weight:900}
+  .sheet .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
+  label.lbl{display:block;font-weight:800;font-size:14px;margin:16px 2px 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .field{width:100%;padding:14px 16px;border-radius:14px;border:2px solid var(--line);background:#fff;font-size:18px;font-weight:700;outline:none}
+  .field:focus{border-color:var(--ink)}
+  .emoji-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .emoji-grid button{aspect-ratio:1;border-radius:12px;font-size:26px;background:#fff;box-shadow:0 2px 0 var(--line)}
+  .emoji-grid button.sel{background:var(--ink);box-shadow:none;transform:scale(1.05)}
+  .sound-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding:2px}
+  .sound-opt{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:8px 8px 8px 14px;border:2px solid transparent;box-shadow:0 2px 0 var(--line);text-align:left}
+  .sound-opt.sel{border-color:var(--ink)}
+  .sound-opt .nm{flex:1;font-weight:800}
+  .sound-opt .icon-btn{width:38px;height:38px;font-size:16px}
+  .sheet-actions{display:flex;gap:10px;margin-top:22px}
+  .sheet-actions .btn{flex:1}
+
+  .wait{text-align:center;padding:16px 0 4px}
+  .wait .disc{margin:18px auto;width:170px;height:170px;font-size:80px;color:var(--accent)}
+  .wait p{font-weight:700;color:var(--muted);margin:6px 0 18px}
+
+  .rec-btn{width:130px;height:130px;border-radius:50%;margin:18px auto 10px;display:flex;align-items:center;justify-content:center;font-size:52px;background:var(--accent);color:#fff;box-shadow:0 8px 0 #C9383D}
+  .rec-btn.on{animation:recpulse 1s infinite}
+  @keyframes recpulse{50%{box-shadow:0 8px 0 #C9383D,0 0 0 18px rgba(255,90,95,.18)}}
+  .rec-time{text-align:center;font-size:28px;font-weight:900;font-variant-numeric:tabular-nums}
+
+  .setting{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 2px 0 var(--line)}
+  .setting .t1{font-weight:800;font-size:17px}
+  .setting .t2{font-size:14px;color:var(--muted);font-weight:600;margin-top:4px;line-height:1.4}
+  .setting .ctrl{margin-top:12px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .switch{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .switch input{width:52px;height:30px;accent-color:var(--ok)}
+  .sim-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .sim-list button{background:#F3ECFA;border-radius:12px;padding:8px 12px;font-weight:800}
+
+  #toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;background:var(--ink);color:#fff;font-weight:700;padding:12px 18px;border-radius:14px;max-width:88vw;text-align:center;transition:all .25s;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div id="startOverlay">
+  <div style="font-size:64px">📡🔊</div>
+  <h1>Soni<span>Tag</span></h1>
+  <p>Acerca una etiqueta NFC a la parte de atrás del móvil y sonará su sonido.</p>
+  <button class="bigplay" id="startBtn" aria-label="Empezar">▶</button>
+  <div id="nfcWarn"></div>
+</div>
+
+<header>
+  <div class="logo">Soni<span>Tag</span></div>
+  <div class="status" id="status"><i></i><span>Parado</span></div>
+</header>
+
+<main>
+  <!-- JUGAR -->
+  <section class="view active" id="view-play">
+    <div id="stage">
+      <div class="disc" id="disc"><div class="waves"></div><span id="discEmoji">📡</span></div>
+      <div class="stage-name" id="stageName">Acerca una etiqueta</div>
+      <div class="stage-sub" id="stageSub">a la parte de atrás del móvil</div>
+      <div class="stage-btn" id="stageBtn"></div>
+    </div>
+  </section>
+
+  <!-- ETIQUETAS -->
+  <section class="view" id="view-tags">
+    <h2>Etiquetas</h2>
+    <p class="hint">Cada etiqueta tiene su dibujo y su sonido. Toca una para cambiarla.</p>
+    <button class="btn accent wide" id="addTagBtn" style="margin-bottom:16px">＋ Añadir etiqueta</button>
+    <div id="tagList"></div>
+  </section>
+
+  <!-- SONIDOS -->
+  <section class="view" id="view-sounds">
+    <h2>Sonidos</h2>
+    <p class="hint">Sube tus propios sonidos o grábalos con el micrófono.</p>
+    <div class="btn-row">
+      <button class="btn accent" id="uploadBtn">📁 Subir</button>
+      <button class="btn" id="recordBtn">🎙 Grabar</button>
+    </div>
+    <div id="soundList"></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view" id="view-settings">
+    <h2>Ajustes</h2>
+    <div class="setting">
+      <div class="t1">🔊 Volumen</div>
+      <div class="ctrl"><input type="range" id="volume" min="0" max="1" step="0.05"></div>
+    </div>
+    <div class="setting">
+      <div class="switch">
+        <div><div class="t1">☀️ Pantalla siempre encendida</div>
+        <div class="t2">El NFC solo funciona con la pantalla encendida y la app abierta.</div></div>
+        <input type="checkbox" id="wakeToggle">
+      </div>
+    </div>
+    <div class="setting">
+      <div class="t1">💾 Copia de seguridad</div>
+      <div class="t2">Guarda etiquetas y sonidos en un archivo, para pasarlos a otro móvil o no perderlos si se borran los datos del navegador.</div>
+      <div class="btn-row ctrl" style="margin-bottom:0">
+        <button class="btn ghost" id="exportBtn">⬇️ Exportar</button>
+        <button class="btn ghost" id="importBtn">⬆️ Importar</button>
+      </div>
+    </div>
+    <div class="setting">
+      <div class="t1">🧪 Probar sin NFC</div>
+      <div class="t2">Simula que se acerca una etiqueta.</div>
+      <div class="sim-list" id="simList"></div>
+    </div>
+    <div class="setting">
+      <div class="t1">ℹ️ Consejos</div>
+      <div class="t2">
+        • Funciona en Chrome para Android con el NFC activado.<br>
+        • La antena suele estar en el centro de la parte trasera.<br>
+        • Valen casi todas las etiquetas; las NTAG213/215/216 van perfectas.<br>
+        • El número de cada etiqueta es su UID, el mismo que leerá el lector de la ESP32.
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-view="play" class="active"><b>🎵</b>Jugar</button>
+  <button data-view="tags"><b>🏷️</b>Etiquetas</button>
+  <button data-view="sounds"><b>🔊</b>Sonidos</button>
+  <button data-view="settings"><b>⚙️</b>Ajustes</button>
+</nav>
+
+<input type="file" id="fileInput" accept="audio/*" multiple hidden>
+<input type="file" id="importInput" accept="application/json,.json" hidden>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================
+   Utilidades
+   ========================================================= */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+let toastTimer;
+function toast(msg, ms = 2600){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+const PALETTE = ["#FFD6D6","#FFE7B8","#D9F2C7","#CDEBFF","#E6D9FF","#FFD9F0","#C9F1EC","#FFF0B3"];
+const STRONG  = ["#FF5A5F","#F4A300","#4CAF50","#2D9CDB","#8E6CFF","#E84393","#14A89A","#E1B000"];
+function colorIdx(id){ let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % PALETTE.length; }
+const EMOJIS = ["🐶","🐱","🐮","🐷","🦁","🐸","🐵","🐔","🦆","🐴","🐘","🐑","🦖","🐝","🚗","🚒","🚀","🚂","✈️","⚽","🎸","🥁","🎺","🔔","👻","⚡","🌧️","💩","🦄","🍕","🌈","⭐","❤️","🎁","🤖"];
+
+/* =========================================================
+   Base de datos (IndexedDB)
+   ========================================================= */
+const DB = {
+  db: null,
+  open(){
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("sonitag", 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains("sounds")) d.createObjectStore("sounds", { keyPath: "id" });
+        if (!d.objectStoreNames.contains("tags"))   d.createObjectStore("tags",   { keyPath: "id" });
+      };
+      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  tx(store, mode, fn){
+    return new Promise((res, rej) => {
+      const t = this.db.transaction(store, mode); const s = t.objectStore(store);
+      const out = fn(s); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error);
+    });
+  },
+  all(store){ return this.tx(store, "readonly", s => s.getAll()); },
+  put(store, obj){ return this.tx(store, "readwrite", s => s.put(obj)); },
+  del(store, id){ return this.tx(store, "readwrite", s => s.delete(id)); },
+};
+
+/* =========================================================
+   Estado
+   ========================================================= */
+const state = {
+  tags: new Map(),        // id -> {id, name, emoji, soundId, createdAt}
+  userSounds: [],         // {id, name, blob, createdAt}
+  volume: 0.9,
+  wake: true,
+};
+try {
+  const v = parseFloat(localStorage.getItem("sonitag.volume")); if (!isNaN(v)) state.volume = v;
+  const w = localStorage.getItem("sonitag.wake"); if (w !== null) state.wake = w === "1";
+} catch {}
+function saveSetting(k, v){ try { localStorage.setItem("sonitag." + k, v); } catch {} }
+
+/* =========================================================
+   Sonidos de serie (sintetizados, no necesitan archivos)
+   ========================================================= */
+function env(g, t, a, peak, d){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function osc(c, out, type, f, t, dur, peak = .5, a = .01){
+  const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+  env(g, t, a, peak, dur); o.connect(g).connect(out); o.start(t); o.stop(t + a + dur + .05); return o;
+}
+function noise(c, dur){
+  const b = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const s = c.createBufferSource(); s.buffer = b; return s;
+}
+const SYNTH = {
+  pitido(c, out, t){ osc(c, out, "sine", 880, t, .3, .6); },
+  boing(c, out, t){ const o = osc(c, out, "sine", 520, t, .7, .7); o.frequency.exponentialRampToValueAtTime(110, t + .7);
+    const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 18; lg.gain.value = 40; l.connect(lg).connect(o.frequency); l.start(t); l.stop(t + .8); },
+  campana(c, out, t){ [[1046,.5,2],[2637,.2,1.4],[5160,.08,.8],[1568,.15,1.6]].forEach(([f,p,d]) => osc(c, out, "sine", f, t, d, p, .005)); },
+  moneda(c, out, t){ osc(c, out, "square", 988, t, .08, .25); osc(c, out, "square", 1319, t + .08, .45, .25); },
+  laser(c, out, t){ const o = osc(c, out, "sawtooth", 1800, t, .35, .3); o.frequency.exponentialRampToValueAtTime(90, t + .35); },
+  tambor(c, out, t){ const o = osc(c, out, "sine", 160, t, .45, .9, .003); o.frequency.exponentialRampToValueAtTime(45, t + .4);
+    const n = noise(c, .2), g = c.createGain(), f = c.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 1200;
+    env(g, t, .002, .35, .15); n.connect(f).connect(g).connect(out); n.start(t); },
+  sirena(c, out, t){ const o = osc(c, out, "triangle", 700, t, 1.8, .45, .05);
+    const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 1.6; lg.gain.value = 220; l.connect(lg).connect(o.frequency); l.start(t); l.stop(t + 1.9); },
+  pedorreta(c, out, t){ const o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(95, t); o.frequency.linearRampToValueAtTime(70, t + .9);
+    const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 23; lg.gain.value = 30; l.connect(lg).connect(o.frequency);
+    f.type = "lowpass"; f.frequency.value = 600; f.Q.value = 6; env(g, t, .02, .8, .9);
+    o.connect(f).connect(g).connect(out); o.start(t); o.stop(t + 1); l.start(t); l.stop(t + 1); },
+  arpa(c, out, t){ [523,659,784,1046,1318].forEach((f, i) => osc(c, out, "triangle", f, t + i * .09, .6, .35, .005)); },
+  muelle(c, out, t){ for (let i = 0; i < 4; i++){ const o = osc(c, out, "sine", 300 + i*120, t + i*.12, .12, .4); o.frequency.exponentialRampToValueAtTime(900 + i*200, t + i*.12 + .12); } },
+};
+const BUILTIN = [
+  ["pitido","Pitido"],["boing","Boing"],["campana","Campana"],["moneda","Moneda"],["laser","Láser"],
+  ["tambor","Tambor"],["sirena","Sirena"],["pedorreta","Pedorreta"],["arpa","Arpa mágica"],["muelle","Muelle"],
+].map(([k, n]) => ({ id: "b:" + k, key: k, name: n, builtin: true }));
+
+function allSounds(){ return [...state.userSounds, ...BUILTIN]; }
+function soundById(id){ return allSounds().find(s => s.id === id); }
+function soundName(id){ return soundById(id)?.name ?? "—"; }
+
+/* =========================================================
+   Audio
+   ========================================================= */
+let ctx = null, currentOut = null, currentSrc = null;
+const bufCache = new Map();
+function ensureCtx(){
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") ctx.resume();
+  return ctx;
+}
+function stopAll(){
+  if (currentOut){ const o = currentOut; try { o.gain.setTargetAtTime(0, ctx.currentTime, .02); } catch {} setTimeout(() => o.disconnect(), 200); }
+  if (currentSrc){ try { currentSrc.stop(ctx.currentTime + .1); } catch {} }
+  currentOut = null; currentSrc = null;
+}
+async function decodeBlob(blob){
+  const c = ensureCtx(); const ab = await blob.arrayBuffer();
+  return await new Promise((res, rej) => c.decodeAudioData(ab, res, rej));
+}
+async function playSound(id){
+  const s = soundById(id) || BUILTIN[0];
+  const c = ensureCtx(); stopAll();
+  const out = c.createGain(); out.gain.value = state.volume; out.connect(c.destination); currentOut = out;
+  if (s.builtin){ SYNTH[s.key](c, out, c.currentTime + .01); return; }
+  try {
+    let buf = bufCache.get(s.id);
+    if (!buf){ buf = await decodeBlob(s.blob); bufCache.set(s.id, buf); }
+    if (currentOut !== out) return;  // se pidió otro sonido mientras se decodificaba
+    const src = c.createBufferSource(); src.buffer = buf; src.connect(out); src.start(); currentSrc = src;
+  } catch (e){ toast("No puedo reproducir «" + s.name + "»"); }
+}
+
+/* =========================================================
+   NFC
+   ========================================================= */
+let nfcOn = false, captureCb = null, lastId = null, lastAt = 0, wakeLock = null;
+const hasNFC = "NDEFReader" in window;
+
+function setStatus(kind, text){
+  const el = $("#status"); el.className = "status" + (kind === "on" ? " on" : kind === "bad" ? " bad" : "");
+  $("span", el).textContent = text;
+}
+async function startNFC(){
+  if (!hasNFC){ setStatus("bad", "Sin NFC"); return false; }
+  if (nfcOn) return true;
+  try {
+    const reader = new NDEFReader();
+    reader.addEventListener("reading", e => {
+      const id = tagIdFrom(e);
+      if (!id){ toast("He detectado la etiqueta pero no puedo leer su número"); return; }
+      onTag(id);
+    });
+    reader.addEventListener("readingerror", () => toast("No he podido leer la etiqueta. Déjala quieta un momento."));
+    await reader.scan();
+    nfcOn = true; setStatus("on", "Escuchando");
+    return true;
+  } catch (err){
+    if (err.name === "NotAllowedError") setStatus("bad", "Sin permiso");
+    else if (err.name === "NotReadableError") setStatus("bad", "NFC apagado");
+    else setStatus("bad", "Error NFC");
+    toast(err.name === "NotReadableError" ? "Activa el NFC en los ajustes del móvil y vuelve a intentarlo"
+         : err.name === "NotAllowedError" ? "Hace falta dar permiso de NFC a la página" : "No se pudo iniciar el NFC: " + err.message, 4500);
+    return false;
+  }
+}
+function tagIdFrom(e){
+  if (e.serialNumber) return e.serialNumber.toUpperCase();
+  try {
+    for (const r of e.message.records){
+      if (r.recordType === "text" || r.recordType === "url"){
+        const t = new TextDecoder(r.encoding || "utf-8").decode(r.data);
+        if (t) return (r.recordType === "url" ? "URL:" : "TXT:") + t.slice(0, 80);
+      }
+    }
+  } catch {}
+  return null;
+}
+async function requestWake(){
+  if (!state.wake || !("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+  try { wakeLock = await navigator.wakeLock.request("screen"); } catch {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") requestWake(); });
+
+function onTag(id){
+  const now = Date.now();
+  if (id === lastId && now - lastAt < 1500) return;
+  lastId = id; lastAt = now;
+  try { navigator.vibrate && navigator.vibrate(50); } catch {}
+  if (captureCb){ const cb = captureCb; captureCb = null; cb(id); return; }
+  const tag = state.tags.get(id);
+  if (!$(".scrim")) switchView("play");
+  if (tag){ playSound(tag.soundId); showTagOnStage(tag); }
+  else { playSound("b:muelle"); showUnknownOnStage(id); }
+}
+
+/* =========================================================
+   Escenario (Jugar)
+   ========================================================= */
+function animateDisc(){
+  const d = $("#disc"); d.classList.remove("pop"); $("#stage").classList.remove("burst");
+  void d.offsetWidth; d.classList.add("pop"); $("#stage").classList.add("burst");
+}
+function showTagOnStage(tag){
+  const i = colorIdx(tag.id);
+  $("#stage").style.background = PALETTE[i];
+  $("#disc").style.background = "#fff"; $("#disc").style.color = STRONG[i];
+  $("#discEmoji").textContent = tag.emoji || "🏷️";
+  $("#stageName").textContent = tag.name || "Etiqueta";
+  $("#stageSub").textContent = "🔊 " + soundName(tag.soundId);
+  $("#stageBtn").innerHTML = "";
+  animateDisc();
+}
+function showUnknownOnStage(id){
+  $("#stage").style.background = "#fff"; $("#disc").style.background = "#F3ECFA"; $("#disc").style.color = "var(--accent)";
+  $("#discEmoji").textContent = "❓";
+  $("#stageName").textContent = "¡Etiqueta nueva!";
+  $("#stageSub").textContent = "Todavía no tiene sonido";
+  $("#stageBtn").innerHTML = '<button class="btn accent">🎵 Darle un sonido</button>';
+  $("#stageBtn button").onclick = () => openTagEditor(id);
+  animateDisc();
+}
+function resetStage(){
+  $("#stage").style.background = ""; $("#disc").style.background = ""; $("#disc").style.color = "var(--accent)";
+  $("#discEmoji").textContent = "📡";
+  $("#stageName").textContent = "Acerca una etiqueta"; $("#stageSub").textContent = "a la parte de atrás del móvil";
+  $("#stageBtn").innerHTML = "";
+}
+
+/* =========================================================
+   Navegación
+   ========================================================= */
+function switchView(v){
+  document.querySelectorAll(".view").forEach(s => s.classList.toggle("active", s.id === "view-" + v));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+  if (v === "tags") renderTags(); if (v === "sounds") renderSounds(); if (v === "settings") renderSim();
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => switchView(b.dataset.view));
+
+/* =========================================================
+   Hojas / diálogos
+   ========================================================= */
+function openSheet(html, onClose){
+  closeSheet();
+  const s = document.createElement("div"); s.className = "scrim";
+  s.innerHTML = '<div class="sheet">' + html + "</div>";
+  s.addEventListener("click", e => { if (e.target === s) closeSheet(); });
+  s._onClose = onClose; document.body.appendChild(s); return $(".sheet", s);
+}
+function closeSheet(){
+  const s = $(".scrim"); if (!s) return;
+  const cb = s._onClose; s.remove(); if (cb) cb();
+}
+function ask({ title, text = "", input = null, ok = "Aceptar", danger = false }){
+  return new Promise(res => {
+    let done = false;
+    const sh = openSheet(`<h3>${esc(title)}</h3>${text ? `<p class="hint" style="margin:6px 0 0">${esc(text)}</p>` : ""}
+      ${input !== null ? `<input class="field" id="askIn" style="margin-top:14px" value="${esc(input)}">` : ""}
+      <div class="sheet-actions"><button class="btn ghost" id="askNo">Cancelar</button><button class="btn ${danger ? "danger" : "accent"}" id="askOk">${esc(ok)}</button></div>`,
+      () => { if (!done) res(null); });
+    const fin = v => { done = true; closeSheet(); res(v); };
+    $("#askNo", sh).onclick = () => fin(null);
+    $("#askOk", sh).onclick = () => fin(input !== null ? $("#askIn", sh).value.trim() : true);
+    if (input !== null) setTimeout(() => $("#askIn", sh).focus(), 50);
+  });
+}
+
+/* =========================================================
+   Etiquetas
+   ========================================================= */
+function renderTags(){
+  const list = $("#tagList");
+  const tags = [...state.tags.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  if (!tags.length){ list.innerHTML = '<div class="empty">Aún no hay etiquetas.<br>Pulsa «Añadir etiqueta» o acerca una al móvil.</div>'; return; }
+  list.innerHTML = tags.map(t => `
+    <div class="row" data-id="${esc(t.id)}">
+      <div class="emo" style="background:${PALETTE[colorIdx(t.id)]}">${esc(t.emoji || "🏷️")}</div>
+      <div class="txt"><div class="t1">${esc(t.name || "Sin nombre")}</div><div class="t2">🔊 ${esc(soundName(t.soundId))}</div></div>
+      <button class="icon-btn" data-act="play" aria-label="Escuchar">▶</button>
+    </div>`).join("");
+  list.querySelectorAll(".row").forEach(r => {
+    const id = r.dataset.id;
+    r.onclick = e => {
+      if (e.target.closest("[data-act=play]")){ e.stopPropagation(); playSound(state.tags.get(id).soundId); return; }
+      openTagEditor(id);
+    };
+  });
+}
+
+async function waitForTag(){
+  const ok = await startNFC();
+  const sh = openSheet(`<div class="wait">
+      <h3>Acerca la etiqueta</h3>
+      <div class="disc burst" style="background:#F3ECFA"><div class="waves"></div>🏷️</div>
+      <p>${ok ? "Ponla en la parte de atrás del móvil…" : "El NFC no está disponible aquí."}</p>
+      <button class="btn ghost wide" id="waitCancel">Cancelar</button></div>`,
+    () => { captureCb = null; });
+  $("#waitCancel", sh).onclick = closeSheet;
+  captureCb = id => { closeSheet(); openTagEditor(id); };
+}
+$("#addTagBtn").onclick = waitForTag;
+
+function openTagEditor(id, draftIn = null){
+  const existing = state.tags.get(id);
+  const draft = draftIn || (existing ? { ...existing } : { id, name: "", emoji: EMOJIS[colorIdx(id) % EMOJIS.length], soundId: "b:pitido" });
+  const sh = openSheet(`
+    <h3>${existing ? "Editar etiqueta" : "Etiqueta nueva"}</h3>
+    <div class="mono">${esc(id)}</div>
+    <label class="lbl">Nombre</label>
+    <input class="field" id="tName" placeholder="Ej.: Perro" maxlength="30" value="${esc(draft.name)}">
+    <label class="lbl">Dibujo</label>
+    <div class="emoji-grid" id="tEmo">${EMOJIS.map(e => `<button data-e="${e}" class="${e === draft.emoji ? "sel" : ""}">${e}</button>`).join("")}</div>
+    <label class="lbl">Sonido</label>
+    <div class="btn-row" style="margin-bottom:10px">
+      <button class="btn ghost" id="tUp">📁 Subir</button><button class="btn ghost" id="tRec">🎙 Grabar</button>
+    </div>
+    <div class="sound-list" id="tSnd"></div>
+    <div class="sheet-actions">
+      ${existing ? '<button class="btn danger" id="tDel" style="flex:0 0 auto">🗑</button>' : ""}
+      <button class="btn ghost" id="tCancel">Cancelar</button>
+      <button class="btn accent" id="tSave">Guardar</button>
+    </div>`);
+  const renderSnd = () => {
+    $("#tSnd", sh).innerHTML = allSounds().map(s => `
+      <div class="sound-opt ${s.id === draft.soundId ? "sel" : ""}" data-id="${esc(s.id)}">
+        <span class="nm">${esc(s.name)}${s.builtin ? "" : ' <span class="badge">mío</span>'}</span>
+        <button class="icon-btn" data-act="play">▶</button></div>`).join("");
+    $("#tSnd", sh).querySelectorAll(".sound-opt").forEach(o => o.onclick = () => {
+      draft.soundId = o.dataset.id; playSound(o.dataset.id); renderSnd();
+    });
+    const sel = $(".sound-opt.sel", sh); if (sel) sel.scrollIntoView({ block: "nearest" });
+  };
+  renderSnd();
+  $("#tEmo", sh).onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    draft.emoji = b.dataset.e; $("#tEmo", sh).querySelectorAll("button").forEach(x => x.classList.toggle("sel", x === b));
+  };
+  const keepName = () => { draft.name = $("#tName", sh).value.trim(); };
+  $("#tUp", sh).onclick = () => { keepName(); pickFiles(newIds => { if (newIds.length) draft.soundId = newIds[0]; reopen(); }); };
+  $("#tRec", sh).onclick = () => { keepName(); openRecorder(newId => { if (newId) draft.soundId = newId; reopen(); }); };
+  const reopen = () => openTagEditor(id, draft);
+  $("#tCancel", sh).onclick = closeSheet;
+  $("#tSave", sh).onclick = async () => {
+    keepName(); if (!draft.name) draft.name = "Etiqueta " + (state.tags.size + (existing ? 0 : 1));
+    draft.createdAt = draft.createdAt || Date.now();
+    state.tags.set(id, draft); await DB.put("tags", draft);
+    closeSheet(); toast("✅ Guardada: " + draft.emoji + " " + draft.name);
+    renderTags(); if ($("#view-play").classList.contains("active")) showTagOnStage(draft);
+  };
+  if (existing) $("#tDel", sh).onclick = async () => {
+    const ok = await ask({ title: "¿Borrar «" + (draft.name || "etiqueta") + "»?", text: "La etiqueta física no se borra, solo deja de tener sonido.", ok: "Borrar", danger: true });
+    if (!ok) return openTagEditor(id);
+    state.tags.delete(id); await DB.del("tags", id); renderTags(); resetStage(); toast("Etiqueta borrada");
+  };
+}
+
+/* =========================================================
+   Sonidos
+   ========================================================= */
+function renderSounds(){
+  const list = $("#soundList");
+  const used = id => [...state.tags.values()].filter(t => t.soundId === id).length;
+  const mine = state.userSounds.slice().sort((a, b) => b.createdAt - a.createdAt);
+  const row = s => `
+    <div class="row" data-id="${esc(s.id)}">
+      <button class="icon-btn" data-act="play" style="background:${s.builtin ? "#F3ECFA" : "#FFE3E3"}">▶</button>
+      <div class="txt"><div class="t1">${esc(s.name)}</div><div class="t2">${used(s.id) ? "Usado en " + used(s.id) + " etiqueta" + (used(s.id) > 1 ? "s" : "") : "Sin usar"}</div></div>
+      ${s.builtin ? "" : '<button class="icon-btn" data-act="ren">✏️</button><button class="icon-btn" data-act="del">🗑</button>'}
+    </div>`;
+  list.innerHTML =
+    (mine.length ? '<h2 style="font-size:18px">Mis sonidos</h2>' + mine.map(row).join("") : '<div class="empty">Todavía no has subido ni grabado sonidos.</div>') +
+    '<h2 style="font-size:18px;margin-top:18px">De serie</h2>' + BUILTIN.map(row).join("");
+  list.querySelectorAll(".row").forEach(r => r.onclick = async e => {
+    const id = r.dataset.id, act = e.target.closest("[data-act]")?.dataset.act || "play";
+    if (act === "play") return playSound(id);
+    const s = soundById(id);
+    if (act === "ren"){
+      const n = await ask({ title: "Cambiar nombre", input: s.name, ok: "Guardar" });
+      if (n){ s.name = n; await DB.put("sounds", s); renderSounds(); }
+    }
+    if (act === "del"){
+      const u = used(id);
+      const ok = await ask({ title: "¿Borrar «" + s.name + "»?", text: u ? `Lo usan ${u} etiqueta(s); pasarán a sonar con «Pitido».` : "", ok: "Borrar", danger: true });
+      if (!ok) return;
+      state.userSounds = state.userSounds.filter(x => x.id !== id); bufCache.delete(id); await DB.del("sounds", id);
+      for (const t of state.tags.values()) if (t.soundId === id){ t.soundId = "b:pitido"; await DB.put("tags", t); }
+      renderSounds(); toast("Sonido borrado");
+    }
+  });
+}
+
+let filesCb = null;
+function pickFiles(cb){ filesCb = cb; $("#fileInput").value = ""; $("#fileInput").click(); }
+$("#uploadBtn").onclick = () => pickFiles(() => renderSounds());
+$("#fileInput").onchange = async e => {
+  const files = [...e.target.files]; const added = [];
+  for (const f of files){
+    if (f.size > 15 * 1024 * 1024){ toast("«" + f.name + "» es muy grande (máx. 15 MB)"); continue; }
+    try { await decodeBlob(f); } catch { toast("No entiendo el formato de «" + f.name + "»"); continue; }
+    const s = { id: "u:" + uid(), name: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 40), blob: f, createdAt: Date.now() };
+    state.userSounds.push(s); await DB.put("sounds", s); added.push(s.id);
+  }
+  if (added.length) toast("🎉 " + added.length + " sonido" + (added.length > 1 ? "s añadidos" : " añadido"));
+  const cb = filesCb; filesCb = null;
+  if ($("#view-sounds").classList.contains("active")) renderSounds();
+  if (cb) cb(added);
+};
+
+/* Grabadora */
+function openRecorder(cb){
+  let rec = null, stream = null, chunks = [], blob = null, t0 = 0, timer = null, saved = false;
+  const MAX = 20;
+  const sh = openSheet(`
+    <h3>Grabar un sonido</h3>
+    <p class="hint" style="margin:4px 0 0">Pulsa el botón rojo, haz el sonido y vuelve a pulsar. Máximo ${MAX} s.</p>
+    <button class="rec-btn" id="rBtn">🎙</button>
+    <div class="rec-time" id="rTime">0,0 s</div>
+    <div id="rAfter" style="display:none">
+      <label class="lbl">Nombre</label>
+      <input class="field" id="rName" placeholder="Ej.: Ladrido" maxlength="40">
+      <div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="rPlay">▶ Escuchar</button><button class="btn ghost" id="rAgain">↺ Repetir</button></div>
+    </div>
+    <div class="sheet-actions"><button class="btn ghost" id="rCancel">Cancelar</button><button class="btn accent" id="rSave" disabled style="opacity:.4">Guardar</button></div>`,
+    () => { cleanup(); if (!saved && cb) cb(null); });
+  function cleanup(){ clearInterval(timer); try { rec && rec.state !== "inactive" && rec.stop(); } catch {} stream && stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const btn = $("#rBtn", sh), time = $("#rTime", sh);
+  async function start(){
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } }); }
+    catch { toast("Necesito permiso para usar el micrófono", 3500); return; }
+    chunks = []; blob = null;
+    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+    rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+      stream && stream.getTracks().forEach(t => t.stop()); stream = null;
+      btn.classList.remove("on"); btn.textContent = "🎙";
+      $("#rAfter", sh).style.display = "block"; $("#rSave", sh).disabled = false; $("#rSave", sh).style.opacity = 1;
+    };
+    rec.start(); t0 = Date.now(); btn.classList.add("on"); btn.textContent = "⏹";
+    timer = setInterval(() => {
+      const s = (Date.now() - t0) / 1000; time.textContent = s.toFixed(1).replace(".", ",") + " s";
+      if (s >= MAX) stop();
+    }, 100);
+  }
+  function stop(){ clearInterval(timer); if (rec && rec.state !== "inactive") rec.stop(); }
+  btn.onclick = () => (rec && rec.state === "recording") ? stop() : start();
+  $("#rAgain", sh).onclick = () => { $("#rAfter", sh).style.display = "none"; time.textContent = "0,0 s"; start(); };
+  $("#rPlay", sh).onclick = async () => {
+    if (!blob) return; const c = ensureCtx(); stopAll();
+    try { const b = await decodeBlob(blob); const src = c.createBufferSource(); const g = c.createGain(); g.gain.value = state.volume;
+      src.buffer = b; src.connect(g).connect(c.destination); src.start(); currentSrc = src; currentOut = g; } catch { toast("No puedo reproducir la grabación"); }
+  };
+  $("#rCancel", sh).onclick = closeSheet;
+  $("#rSave", sh).onclick = async () => {
+    if (!blob) return;
+    const s = { id: "u:" + uid(), name: $("#rName", sh).value.trim() || "Grabación " + (state.userSounds.length + 1), blob, createdAt: Date.now() };
+    state.userSounds.push(s); await DB.put("sounds", s); saved = true;
+    closeSheet(); toast("🎉 Sonido guardado"); renderSounds(); if (cb) cb(s.id);
+  };
+}
+$("#recordBtn").onclick = () => openRecorder(() => renderSounds());
+
+/* =========================================================
+   Ajustes
+   ========================================================= */
+$("#volume").value = state.volume;
+$("#volume").oninput = e => { state.volume = +e.target.value; saveSetting("volume", state.volume); if (currentOut) currentOut.gain.value = state.volume; };
+$("#volume").onchange = () => playSound("b:pitido");
+$("#wakeToggle").checked = state.wake;
+$("#wakeToggle").onchange = e => {
+  state.wake = e.target.checked; saveSetting("wake", state.wake ? "1" : "0");
+  if (state.wake) requestWake(); else if (wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; }
+};
+
+function renderSim(){
+  const list = $("#simList");
+  list.innerHTML = '<button data-id="__new">❓ Etiqueta nueva</button>' +
+    [...state.tags.values()].map(t => `<button data-id="${esc(t.id)}">${esc(t.emoji)} ${esc(t.name)}</button>`).join("");
+  list.querySelectorAll("button").forEach(b => b.onclick = () => {
+    ensureCtx();
+    let id = b.dataset.id;
+    if (id === "__new") id = Array.from({ length: 7 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join(":").toUpperCase();
+    lastId = null; onTag(id);
+  });
+}
+
+const blobToDataURL = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+$("#exportBtn").onclick = async () => {
+  const sounds = [];
+  for (const s of state.userSounds) sounds.push({ id: s.id, name: s.name, createdAt: s.createdAt, data: await blobToDataURL(s.blob) });
+  const data = { app: "sonitag", version: 1, exportedAt: new Date().toISOString(), tags: [...state.tags.values()], sounds };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+  const a = document.createElement("a"); a.href = url; a.download = "sonitag-copia-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast("💾 Copia descargada");
+};
+$("#importBtn").onclick = () => { $("#importInput").value = ""; $("#importInput").click(); };
+$("#importInput").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (data.app !== "sonitag") throw new Error("formato");
+    for (const s of data.sounds || []){
+      const blob = await (await fetch(s.data)).blob();
+      const obj = { id: s.id, name: s.name, createdAt: s.createdAt || Date.now(), blob };
+      state.userSounds = state.userSounds.filter(x => x.id !== obj.id); state.userSounds.push(obj); bufCache.delete(obj.id);
+      await DB.put("sounds", obj);
+    }
+    for (const t of data.tags || []){ state.tags.set(t.id, t); await DB.put("tags", t); }
+    toast(`✅ Importadas ${(data.tags || []).length} etiquetas y ${(data.sounds || []).length} sonidos`, 3500);
+    renderSim();
+  } catch { toast("Ese archivo no es una copia de SoniTag", 3500); }
+};
+
+/* =========================================================
+   Arranque
+   ========================================================= */
+if (!hasNFC){
+  const w = $("#nfcWarn"); w.style.display = "block";
+  w.innerHTML = "⚠️ Este navegador no puede leer NFC. Abre la app en <b>Chrome para Android</b>. Aquí puedes probarla igualmente desde Ajustes → Probar sin NFC.";
+  setStatus("bad", "Sin NFC");
+}
+$("#startBtn").onclick = async () => {
+  ensureCtx(); playSound("b:arpa");
+  $("#startOverlay").classList.add("hide");
+  requestWake();
+  await startNFC();
+};
+
+(async () => {
+  try {
+    await DB.open();
+    const [sounds, tags] = await Promise.all([DB.all("sounds"), DB.all("tags")]);
+    state.userSounds = sounds || [];
+    (tags || []).forEach(t => state.tags.set(t.id, t));
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  } catch (e){ toast("No puedo guardar datos en este navegador", 4000); }
+  $("#disc").style.color = "var(--accent)";
+})();
+
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
