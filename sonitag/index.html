@@ -126,8 +126,15 @@
   .sim-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
   .sim-list button{background:#F3ECFA;border-radius:12px;padding:8px 12px;font-weight:800}
 
-  #toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;background:var(--ink);color:#fff;font-weight:700;padding:12px 18px;border-radius:14px;max-width:88vw;text-align:center;transition:all .25s;pointer-events:none}
+  #stopBtn{position:fixed;left:50%;bottom:104px;z-index:45;transform:translateX(-50%) scale(.6);opacity:0;pointer-events:none;
+    background:var(--accent);color:#fff;font-weight:900;font-size:22px;padding:16px 34px;border-radius:999px;
+    box-shadow:0 6px 0 #C9383D,0 10px 30px rgba(255,90,95,.35);transition:transform .18s cubic-bezier(.2,1.5,.4,1),opacity .15s}
+  #stopBtn.show{opacity:1;transform:translateX(-50%) scale(1);pointer-events:auto}
+  #stopBtn:active{transform:translateX(-50%) translateY(4px);box-shadow:0 2px 0 #C9383D}
+  body.has-sheet #stopBtn{bottom:auto;top:10px;font-size:18px;padding:12px 26px}
+  #toast{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-20px);opacity:0;z-index:60;background:var(--ink);color:#fff;font-weight:700;padding:12px 18px;border-radius:14px;max-width:88vw;text-align:center;transition:all .25s;pointer-events:none}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #disc{cursor:pointer}
 </style>
 </head>
 <body>
@@ -228,6 +235,7 @@
 <input type="file" id="fileInput" accept="audio/*" multiple hidden>
 <input type="file" id="importInput" accept="application/json,.json" hidden>
 <div id="toast"></div>
+<button id="stopBtn" aria-label="Parar sonido">⏹ Parar</button>
 
 <script>
 "use strict";
@@ -351,7 +359,10 @@ function ensureCtx(){
   if (ctx.state === "suspended") ctx.resume();
   return ctx;
 }
+let playTimer = null;
+function setPlaying(on){ clearTimeout(playTimer); $("#stopBtn").classList.toggle("show", on); }
 function stopAll(){
+  setPlaying(false);
   if (currentOut){ const o = currentOut; try { o.gain.setTargetAtTime(0, ctx.currentTime, .02); } catch {} setTimeout(() => o.disconnect(), 200); }
   if (currentSrc){ try { currentSrc.stop(ctx.currentTime + .1); } catch {} }
   currentOut = null; currentSrc = null;
@@ -364,12 +375,14 @@ async function playSound(id){
   const s = soundById(id) || BUILTIN[0];
   const c = ensureCtx(); stopAll();
   const out = c.createGain(); out.gain.value = state.volume; out.connect(c.destination); currentOut = out;
-  if (s.builtin){ SYNTH[s.key](c, out, c.currentTime + .01); return; }
+  if (s.builtin){ SYNTH[s.key](c, out, c.currentTime + .01); setPlaying(true); playTimer = setTimeout(() => setPlaying(false), 2000); return; }
   try {
     let buf = bufCache.get(s.id);
     if (!buf){ buf = await decodeBlob(s.blob); bufCache.set(s.id, buf); }
     if (currentOut !== out) return;  // se pidió otro sonido mientras se decodificaba
     const src = c.createBufferSource(); src.buffer = buf; src.connect(out); src.start(); currentSrc = src;
+    src.onended = () => { if (currentSrc === src){ currentSrc = null; setPlaying(false); } };
+    setPlaying(true);
   } catch (e){ toast("No puedo reproducir «" + s.name + "»"); }
 }
 
@@ -512,11 +525,11 @@ function openSheet(html, onClose){
   const s = document.createElement("div"); s.className = "scrim";
   s.innerHTML = '<div class="sheet">' + html + "</div>";
   s.addEventListener("click", e => { if (e.target === s) closeSheet(); });
-  s._onClose = onClose; document.body.appendChild(s); return $(".sheet", s);
+  s._onClose = onClose; document.body.appendChild(s); document.body.classList.add("has-sheet"); return $(".sheet", s);
 }
 function closeSheet(){
   const s = $(".scrim"); if (!s) return;
-  const cb = s._onClose; s.remove(); if (cb) cb();
+  const cb = s._onClose; s.remove(); document.body.classList.remove("has-sheet"); if (cb) cb();
 }
 function ask({ title, text = "", input = null, ok = "Aceptar", danger = false }){
   return new Promise(res => {
@@ -717,7 +730,8 @@ function openRecorder(cb){
   $("#rPlay", sh).onclick = async () => {
     if (!blob) return; const c = ensureCtx(); stopAll();
     try { const b = await decodeBlob(blob); const src = c.createBufferSource(); const g = c.createGain(); g.gain.value = state.volume;
-      src.buffer = b; src.connect(g).connect(c.destination); src.start(); currentSrc = src; currentOut = g; } catch { toast("No puedo reproducir la grabación"); }
+      src.buffer = b; src.connect(g).connect(c.destination); src.start(); currentSrc = src; currentOut = g;
+      setPlaying(true); src.onended = () => { if (currentSrc === src){ currentSrc = null; setPlaying(false); } }; } catch { toast("No puedo reproducir la grabación"); }
   };
   $("#rCancel", sh).onclick = closeSheet;
   $("#rSave", sh).onclick = async () => {
@@ -808,6 +822,8 @@ if (hasNFC && /SamsungBrowser|Firefox|OPR\//.test(navigator.userAgent)){
   const w = $("#nfcWarn"); w.style.display = "block";
   w.innerHTML = "💡 Si al acercar una etiqueta se abre otra pantalla del móvil, abre esta página en <b>Chrome</b>.";
 }
+$("#stopBtn").onclick = e => { e.stopPropagation(); stopAll(); };
+$("#disc").onclick = () => stopAll();
 $("#startBtn").onclick = async () => {
   ensureCtx(); playSound("b:arpa");
   $("#startOverlay").classList.add("hide");
