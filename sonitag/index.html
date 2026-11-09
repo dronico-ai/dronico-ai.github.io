@@ -190,6 +190,10 @@
       </div>
     </div>
     <div class="setting">
+      <div class="t1">📱 Guardado en este móvil</div>
+      <div class="t2" id="storageInfo">…</div>
+    </div>
+    <div class="setting">
       <div class="t1">💾 Copia de seguridad</div>
       <div class="t2">Guarda etiquetas y sonidos en un archivo, para pasarlos a otro móvil o no perderlos si se borran los datos del navegador.</div>
       <div class="btn-row ctrl" style="margin-bottom:0">
@@ -246,6 +250,11 @@ const EMOJIS = ["🐶","🐱","🐮","🐷","🦁","🐸","🐵","🐔","🦆","
 /* =========================================================
    Base de datos (IndexedDB)
    ========================================================= */
+async function save(store, obj){
+  try { await DB.put(store, obj); return true; }
+  catch (e){ console.error(e); toast("⚠️ No se ha podido guardar en el móvil (" + (e && e.name || "error") + ")", 5000); return false; }
+}
+async function remove(store, id){ try { await remove(store, id); } catch (e){ console.error(e); } }
 const DB = {
   db: null,
   open(){
@@ -262,8 +271,12 @@ const DB = {
   },
   tx(store, mode, fn){
     return new Promise((res, rej) => {
-      const t = this.db.transaction(store, mode); const s = t.objectStore(store);
-      const out = fn(s); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error);
+      if (!this.db) return rej(new Error("sin base de datos"));
+      try {
+        const t = this.db.transaction(store, mode); const s = t.objectStore(store);
+        const out = fn(s); t.oncomplete = () => res(out && out.result);
+        t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error("abortada"));
+      } catch (e){ rej(e); }
     });
   },
   all(store){ return this.tx(store, "readonly", s => s.getAll()); },
@@ -487,7 +500,7 @@ function refreshIdle(){ if (stageIdle) resetStage(); }
 function switchView(v){
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("active", s.id === "view-" + v));
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
-  if (v === "tags") renderTags(); if (v === "sounds") renderSounds(); if (v === "settings") renderSim();
+  if (v === "tags") renderTags(); if (v === "sounds") renderSounds(); if (v === "settings"){ renderSim(); renderStorage(); }
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => switchView(b.dataset.view));
 
@@ -597,14 +610,14 @@ function openTagEditor(id, draftIn = null){
   $("#tSave", sh).onclick = async () => {
     keepName(); if (!draft.name) draft.name = "Etiqueta " + (state.tags.size + (existing ? 0 : 1));
     draft.createdAt = draft.createdAt || Date.now();
-    state.tags.set(id, draft); await DB.put("tags", draft);
+    state.tags.set(id, draft); await save("tags", draft);
     closeSheet(); toast("✅ Guardada: " + draft.emoji + " " + draft.name);
     renderTags(); if ($("#view-play").classList.contains("active")) showTagOnStage(draft);
   };
   if (existing) $("#tDel", sh).onclick = async () => {
     const ok = await ask({ title: "¿Borrar «" + (draft.name || "etiqueta") + "»?", text: "La etiqueta física no se borra, solo deja de tener sonido.", ok: "Borrar", danger: true });
     if (!ok) return openTagEditor(id);
-    state.tags.delete(id); await DB.del("tags", id); renderTags(); resetStage(); toast("Etiqueta borrada");
+    state.tags.delete(id); await remove("tags", id); renderTags(); resetStage(); toast("Etiqueta borrada");
   };
 }
 
@@ -630,14 +643,14 @@ function renderSounds(){
     const s = soundById(id);
     if (act === "ren"){
       const n = await ask({ title: "Cambiar nombre", input: s.name, ok: "Guardar" });
-      if (n){ s.name = n; await DB.put("sounds", s); renderSounds(); }
+      if (n){ s.name = n; await save("sounds", s); renderSounds(); }
     }
     if (act === "del"){
       const u = used(id);
       const ok = await ask({ title: "¿Borrar «" + s.name + "»?", text: u ? `Lo usan ${u} etiqueta(s); pasarán a sonar con «Pitido».` : "", ok: "Borrar", danger: true });
       if (!ok) return;
-      state.userSounds = state.userSounds.filter(x => x.id !== id); bufCache.delete(id); await DB.del("sounds", id);
-      for (const t of state.tags.values()) if (t.soundId === id){ t.soundId = "b:pitido"; await DB.put("tags", t); }
+      state.userSounds = state.userSounds.filter(x => x.id !== id); bufCache.delete(id); await remove("sounds", id);
+      for (const t of state.tags.values()) if (t.soundId === id){ t.soundId = "b:pitido"; await save("tags", t); }
       renderSounds(); toast("Sonido borrado");
     }
   });
@@ -651,8 +664,9 @@ $("#fileInput").onchange = async e => {
   for (const f of files){
     if (f.size > 15 * 1024 * 1024){ toast("«" + f.name + "» es muy grande (máx. 15 MB)"); continue; }
     try { await decodeBlob(f); } catch { toast("No entiendo el formato de «" + f.name + "»"); continue; }
-    const s = { id: "u:" + uid(), name: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 40), blob: f, createdAt: Date.now() };
-    state.userSounds.push(s); await DB.put("sounds", s); added.push(s.id);
+    const blob = new Blob([await f.arrayBuffer()], { type: f.type || "audio/mpeg" });
+    const s = { id: "u:" + uid(), name: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 40), blob, createdAt: Date.now() };
+    state.userSounds.push(s); await save("sounds", s); added.push(s.id);
   }
   if (added.length) toast("🎉 " + added.length + " sonido" + (added.length > 1 ? "s añadidos" : " añadido"));
   const cb = filesCb; filesCb = null;
@@ -709,7 +723,7 @@ function openRecorder(cb){
   $("#rSave", sh).onclick = async () => {
     if (!blob) return;
     const s = { id: "u:" + uid(), name: $("#rName", sh).value.trim() || "Grabación " + (state.userSounds.length + 1), blob, createdAt: Date.now() };
-    state.userSounds.push(s); await DB.put("sounds", s); saved = true;
+    state.userSounds.push(s); await save("sounds", s); saved = true;
     closeSheet(); toast("🎉 Sonido guardado"); renderSounds(); if (cb) cb(s.id);
   };
 }
@@ -727,6 +741,21 @@ $("#wakeToggle").onchange = e => {
   if (state.wake) requestWake(); else if (wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; }
 };
 
+let dbOk = false, persisted = null;
+async function renderStorage(){
+  const el = $("#storageInfo"); if (!el) return;
+  let tags = "?", sounds = "?";
+  try { tags = (await DB.all("tags")).length; sounds = (await DB.all("sounds")).length; } catch {}
+  let mb = "";
+  try { const e = await navigator.storage.estimate(); mb = " · " + (e.usage / 1048576).toFixed(1).replace(".", ",") + " MB"; } catch {}
+  try { persisted = await navigator.storage.persisted(); } catch {}
+  const nav = /SamsungBrowser/.test(navigator.userAgent) ? "Samsung Internet" : /Chrome/.test(navigator.userAgent) ? "Chrome" : "este navegador";
+  el.innerHTML = dbOk
+    ? `${tags} etiqueta${tags === 1 ? "" : "s"} y ${sounds} sonido${sounds === 1 ? "" : "s"} propio${sounds === 1 ? "" : "s"}${mb}.<br>Navegador: <b>${nav}</b>${matchMedia("(display-mode: standalone)").matches ? " (app instalada)" : ""}.<br>
+       Protección contra borrado automático: <b>${persisted ? "sí ✅" : "no"}</b>${persisted ? "" : " (instalar la app en la pantalla de inicio suele activarla)"}.<br>
+       Cada navegador guarda sus propios datos: usa siempre el mismo.`
+    : "⚠️ Este navegador no deja guardar datos (¿modo incógnito?). Lo que hagas se perderá al cerrar.";
+}
 function renderSim(){
   const list = $("#simList");
   list.innerHTML = '<button data-id="__new">❓ Etiqueta nueva</button>' +
@@ -759,9 +788,9 @@ $("#importInput").onchange = async e => {
       const blob = await (await fetch(s.data)).blob();
       const obj = { id: s.id, name: s.name, createdAt: s.createdAt || Date.now(), blob };
       state.userSounds = state.userSounds.filter(x => x.id !== obj.id); state.userSounds.push(obj); bufCache.delete(obj.id);
-      await DB.put("sounds", obj);
+      await save("sounds", obj);
     }
-    for (const t of data.tags || []){ state.tags.set(t.id, t); await DB.put("tags", t); }
+    for (const t of data.tags || []){ state.tags.set(t.id, t); await save("tags", t); }
     toast(`✅ Importadas ${(data.tags || []).length} etiquetas y ${(data.sounds || []).length} sonidos`, 3500);
     renderSim();
   } catch { toast("Ese archivo no es una copia de SoniTag", 3500); }
@@ -792,8 +821,9 @@ $("#startBtn").onclick = async () => {
     const [sounds, tags] = await Promise.all([DB.all("sounds"), DB.all("tags")]);
     state.userSounds = sounds || [];
     (tags || []).forEach(t => state.tags.set(t.id, t));
-    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  } catch (e){ toast("No puedo guardar datos en este navegador", 4000); }
+    dbOk = true;
+    if (navigator.storage && navigator.storage.persist) persisted = await navigator.storage.persist().catch(() => false);
+  } catch (e){ toast("⚠️ Este navegador no deja guardar datos (¿modo incógnito?)", 5000); }
   $("#disc").style.color = "var(--accent)";
 })();
 
