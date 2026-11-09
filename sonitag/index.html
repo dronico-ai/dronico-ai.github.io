@@ -23,7 +23,7 @@
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 6px}
   .logo{font-weight:900;font-size:22px;letter-spacing:-.5px}
   .logo span{color:var(--accent)}
-  .status{font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;background:#EEE6F6;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .status{cursor:pointer;font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;background:#EEE6F6;color:var(--muted);display:flex;align-items:center;gap:6px}
   .status i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
   .status.on{background:#DDF5E8;color:#1E8A55}
   .status.on i{animation:blink 1.6s infinite}
@@ -370,9 +370,16 @@ function setStatus(kind, text){
   const el = $("#status"); el.className = "status" + (kind === "on" ? " on" : kind === "bad" ? " bad" : "");
   $("span", el).textContent = text;
 }
-async function startNFC(){
-  if (!hasNFC){ setStatus("bad", "Sin NFC"); return false; }
-  if (nfcOn) return true;
+let nfcWanted = false, nfcStarting = null;
+function startNFC(){
+  nfcWanted = true;
+  if (!hasNFC){ setStatus("bad", "Sin NFC"); refreshIdle(); return Promise.resolve(false); }
+  if (nfcOn) return Promise.resolve(true);
+  if (!nfcStarting) nfcStarting = doStartNFC().finally(() => { nfcStarting = null; refreshIdle(); });
+  return nfcStarting;
+}
+async function doStartNFC(){
+  setStatus("", "Activando…");
   try {
     const reader = new NDEFReader();
     reader.addEventListener("reading", e => {
@@ -388,11 +395,16 @@ async function startNFC(){
     if (err.name === "NotAllowedError") setStatus("bad", "Sin permiso");
     else if (err.name === "NotReadableError") setStatus("bad", "NFC apagado");
     else setStatus("bad", "Error NFC");
-    toast(err.name === "NotReadableError" ? "Activa el NFC en los ajustes del móvil y vuelve a intentarlo"
-         : err.name === "NotAllowedError" ? "Hace falta dar permiso de NFC a la página" : "No se pudo iniciar el NFC: " + err.message, 4500);
+    toast(err.name === "NotReadableError" ? "Activa el NFC en los ajustes del móvil y luego toca «Activar NFC»"
+         : err.name === "NotAllowedError" ? "Hace falta dar permiso de NFC a la página" : "No se pudo iniciar el NFC: " + err.message, 5000);
     return false;
   }
 }
+// Al volver a la app (p. ej. después de encender el NFC en Ajustes), reintentar solo
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && nfcWanted && !nfcOn) startNFC();
+});
+$("#status").onclick = () => { ensureCtx(); if (!nfcOn) startNFC(); };
 function tagIdFrom(e){
   if (e.serialNumber) return e.serialNumber.toUpperCase();
   try {
@@ -431,6 +443,7 @@ function animateDisc(){
   void d.offsetWidth; d.classList.add("pop"); $("#stage").classList.add("burst");
 }
 function showTagOnStage(tag){
+  stageIdle = false;
   const i = colorIdx(tag.id);
   $("#stage").style.background = PALETTE[i];
   $("#disc").style.background = "#fff"; $("#disc").style.color = STRONG[i];
@@ -441,6 +454,7 @@ function showTagOnStage(tag){
   animateDisc();
 }
 function showUnknownOnStage(id){
+  stageIdle = false;
   $("#stage").style.background = "#fff"; $("#disc").style.background = "#F3ECFA"; $("#disc").style.color = "var(--accent)";
   $("#discEmoji").textContent = "❓";
   $("#stageName").textContent = "¡Etiqueta nueva!";
@@ -449,12 +463,23 @@ function showUnknownOnStage(id){
   $("#stageBtn button").onclick = () => openTagEditor(id);
   animateDisc();
 }
+let stageIdle = true;
 function resetStage(){
+  stageIdle = true;
   $("#stage").style.background = ""; $("#disc").style.background = ""; $("#disc").style.color = "var(--accent)";
-  $("#discEmoji").textContent = "📡";
-  $("#stageName").textContent = "Acerca una etiqueta"; $("#stageSub").textContent = "a la parte de atrás del móvil";
-  $("#stageBtn").innerHTML = "";
+  if (nfcOn || nfcStarting){
+    $("#discEmoji").textContent = "📡";
+    $("#stageName").textContent = "Acerca una etiqueta"; $("#stageSub").textContent = "a la parte de atrás del móvil";
+    $("#stageBtn").innerHTML = "";
+  } else {
+    $("#discEmoji").textContent = "📴";
+    $("#stageName").textContent = "El NFC no está leyendo";
+    $("#stageSub").textContent = hasNFC ? "Enciende el NFC del móvil y pulsa el botón" : "Abre esta página en Chrome para Android";
+    $("#stageBtn").innerHTML = hasNFC ? '<button class="btn accent">📡 Activar NFC</button>' : "";
+    if (hasNFC) $("#stageBtn button").onclick = () => { ensureCtx(); startNFC(); };
+  }
 }
+function refreshIdle(){ if (stageIdle) resetStage(); }
 
 /* =========================================================
    Navegación
@@ -749,6 +774,10 @@ if (!hasNFC){
   const w = $("#nfcWarn"); w.style.display = "block";
   w.innerHTML = "⚠️ Este navegador no puede leer NFC. Abre la app en <b>Chrome para Android</b>. Aquí puedes probarla igualmente desde Ajustes → Probar sin NFC.";
   setStatus("bad", "Sin NFC");
+}
+if (hasNFC && /SamsungBrowser|Firefox|OPR\//.test(navigator.userAgent)){
+  const w = $("#nfcWarn"); w.style.display = "block";
+  w.innerHTML = "💡 Si al acercar una etiqueta se abre otra pantalla del móvil, abre esta página en <b>Chrome</b>.";
 }
 $("#startBtn").onclick = async () => {
   ensureCtx(); playSound("b:arpa");
