@@ -135,6 +135,7 @@
   #toast{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-20px);opacity:0;z-index:60;background:var(--ink);color:#fff;font-weight:700;padding:12px 18px;border-radius:14px;max-width:88vw;text-align:center;transition:all .25s;pointer-events:none}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   #disc{cursor:pointer}
+  body.has-sheet #toast{top:auto;bottom:28px}
 </style>
 </head>
 <body>
@@ -345,7 +346,17 @@ const BUILTIN = [
   ["tambor","Tambor"],["sirena","Sirena"],["pedorreta","Pedorreta"],["arpa","Arpa mágica"],["muelle","Muelle"],
 ].map(([k, n]) => ({ id: "b:" + k, key: k, name: n, builtin: true }));
 
-function allSounds(){ return [...state.userSounds, ...BUILTIN]; }
+function allSounds(){ return [...state.userSounds.slice().sort((a, b) => b.createdAt - a.createdAt), ...BUILTIN]; }
+async function deleteSound(id){
+  const s = soundById(id); if (!s || s.builtin) return false;
+  const u = [...state.tags.values()].filter(t => t.soundId === id).length;
+  const ok = await ask({ title: "¿Borrar «" + s.name + "»?", text: u ? `Lo usa${u > 1 ? "n" : ""} ${u} etiqueta${u > 1 ? "s" : ""}; pasará${u > 1 ? "n" : ""} a sonar con «Pitido».` : "", ok: "Borrar", danger: true });
+  if (!ok) return false;
+  if (currentSrc) stopAll();
+  state.userSounds = state.userSounds.filter(x => x.id !== id); bufCache.delete(id); await remove("sounds", id);
+  for (const t of state.tags.values()) if (t.soundId === id){ t.soundId = "b:pitido"; await save("tags", t); }
+  toast("🗑 Sonido borrado"); return true;
+}
 function soundById(id){ return allSounds().find(s => s.id === id); }
 function soundName(id){ return soundById(id)?.name ?? "—"; }
 
@@ -604,8 +615,14 @@ function openTagEditor(id, draftIn = null){
     $("#tSnd", sh).innerHTML = allSounds().map(s => `
       <div class="sound-opt ${s.id === draft.soundId ? "sel" : ""}" data-id="${esc(s.id)}">
         <span class="nm">${esc(s.name)}${s.builtin ? "" : ' <span class="badge">mío</span>'}</span>
+        ${s.builtin ? "" : '<button class="icon-btn" data-act="del" aria-label="Borrar">🗑</button>'}
         <button class="icon-btn" data-act="play">▶</button></div>`).join("");
-    $("#tSnd", sh).querySelectorAll(".sound-opt").forEach(o => o.onclick = () => {
+    $("#tSnd", sh).querySelectorAll(".sound-opt").forEach(o => o.onclick = async e => {
+      if (e.target.closest("[data-act=del]")){
+        keepName();
+        if (await deleteSound(o.dataset.id) && draft.soundId === o.dataset.id) draft.soundId = "b:pitido";
+        return openTagEditor(id, draft);
+      }
       draft.soundId = o.dataset.id; playSound(o.dataset.id); renderSnd();
     });
     const sel = $(".sound-opt.sel", sh); if (sel) sel.scrollIntoView({ block: "nearest" });
@@ -658,14 +675,7 @@ function renderSounds(){
       const n = await ask({ title: "Cambiar nombre", input: s.name, ok: "Guardar" });
       if (n){ s.name = n; await save("sounds", s); renderSounds(); }
     }
-    if (act === "del"){
-      const u = used(id);
-      const ok = await ask({ title: "¿Borrar «" + s.name + "»?", text: u ? `Lo usan ${u} etiqueta(s); pasarán a sonar con «Pitido».` : "", ok: "Borrar", danger: true });
-      if (!ok) return;
-      state.userSounds = state.userSounds.filter(x => x.id !== id); bufCache.delete(id); await remove("sounds", id);
-      for (const t of state.tags.values()) if (t.soundId === id){ t.soundId = "b:pitido"; await save("tags", t); }
-      renderSounds(); toast("Sonido borrado");
-    }
+    if (act === "del"){ if (await deleteSound(id)) renderSounds(); }
   });
 }
 
